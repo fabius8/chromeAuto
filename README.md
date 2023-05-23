@@ -1,4 +1,5 @@
 # chromeAuto
+撸毛群控，通过手动获取的网页元素，去批量执行。
 
 ## 打开网页
 `node chromeAuto.js open "URL"`
