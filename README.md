@@ -18,6 +18,6 @@
 ## 关闭某个网页
 `node chromeAuto.js close "URL"`
 
-# 导入switchyOmega配置
+## 导入switchyOmega配置
 `node chromeAuto.js proxyLoad`
 
