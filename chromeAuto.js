@@ -2,12 +2,11 @@ const axios=require('axios');
 const puppeteer=require('puppeteer');
 const net = require('net');
 const path = require('path');
-const io = require('socket.io-client');
-const prompt = require('prompt-sync')();
 require("dotenv").config();
 
 const currentDirectory = process.cwd();
 const relateDirectory = "pproxy\\switchomega_bak\\"
+const metamask_url = "chrome-extension://nkbihfbeogaeaoehlefnkodbefgpgknn/home.html"
 
 let metamask_password = process.env.METAMASK_PASSWORD
 let portBase = 9200
@@ -23,6 +22,12 @@ console.log(commandString, varSting1, varSting2, varSting3)
 
 function sleep(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+function randomSleep(min, max) {
+    const range = max - min;
+    const randomTime = Math.random() * range + min;
+    return new Promise(resolve => setTimeout(resolve, randomTime));
 }
 function isPortTaken(port, host) {
     return new Promise((resolve) => {
@@ -55,6 +60,7 @@ async function BatchMetamaskLogin(){
         let port = portBase + i
         let webSocketDebuggerUrl = "http://127.0.0.1:" + port + "/json/version"
         metamaskLogin(i, port, webSocketDebuggerUrl)
+        //await sleep(100)
     }
 }
 
@@ -66,14 +72,14 @@ async function metamaskLogin(index, port, webSocketDebuggerUrl){
     else {
         return
     }
-
+    await randomSleep(1, 2000) 
     let wsKey = await axios.get(webSocketDebuggerUrl);
     let browser = await puppeteer.connect({
         browserWSEndpoint: wsKey.data.webSocketDebuggerUrl,
         defaultViewport:null
     });
     let page = await browser.newPage()
-    const extensionUrl = `chrome-extension://nkbihfbeogaeaoehlefnkodbefgpgknn/home.html`;
+    const extensionUrl = metamask_url;
     await page.goto(extensionUrl, { waitUntil: 'load' });
     try{
         await sleep(100)
@@ -103,6 +109,7 @@ async function BatchProxyConfigLoad(){
         let port = portBase + i
         let webSocketDebuggerUrl = "http://127.0.0.1:" + port + "/json/version"
         proxyConfigLoad(i, port, webSocketDebuggerUrl)
+        //await sleep(100)
     }
 }
 
@@ -160,6 +167,7 @@ async function batchOpenURL(){
         let port = portBase + i
         let webSocketDebuggerUrl = "http://127.0.0.1:" + port + "/json/version"
         openURL(i, port, webSocketDebuggerUrl)
+        //await sleep(100)
     }
 }
 
@@ -202,6 +210,7 @@ async function argent(){
         let port = portBase + i
         let webSocketDebuggerUrl = "http://127.0.0.1:" + port + "/json/version"
         argentLogin(i, port, webSocketDebuggerUrl)
+        //await sleep(100)
     }
 }
 
@@ -249,6 +258,7 @@ async function batchClickElement(){
         let port = portBase + i
         let webSocketDebuggerUrl = "http://127.0.0.1:" + port + "/json/version"
         click(i, port, webSocketDebuggerUrl, varSting1, varSting2)
+        //await sleep(100)
     }
 }
 
@@ -312,6 +322,7 @@ async function batchInputElement(){
         let port = portBase + i
         let webSocketDebuggerUrl = "http://127.0.0.1:" + port + "/json/version"
         input(i, port, webSocketDebuggerUrl, varSting1, varSting2, varSting3)
+        //await sleep(100)
     }
 }
 
@@ -375,6 +386,7 @@ async function batchClosePage(){
         let port = portBase + i
         let webSocketDebuggerUrl = "http://127.0.0.1:" + port + "/json/version"
         closePage(i, port, webSocketDebuggerUrl, varSting1)
+        //await sleep(100)
     }
 }
 
@@ -412,6 +424,118 @@ async function closePage(index, port, webSocketDebuggerUrl, toCloseURL) {
             console.log(index, 'e==>', e.message)
             await sleep(5000)
         }
+    }
+    
+    //await sleep(3000)
+    await browser.disconnect()
+}
+
+if (commandString == "signin"){
+    console.log(commandString, "...")
+    batchSignIn()
+}
+
+async function batchSignIn(){
+    for(let i = num1; i <= num2; i++){
+        let port = portBase + i
+        let webSocketDebuggerUrl = "http://127.0.0.1:" + port + "/json/version"
+        signIn(i, port, webSocketDebuggerUrl)
+        //await sleep(100)
+    }
+}
+
+
+async function signIn(index, port, webSocketDebuggerUrl) {
+    const result = await isPortTaken(port, '127.0.0.1')
+    if (result) {
+        console.log(index, result, port, "已启动！")
+    }
+    else {
+        return
+    }
+
+    let wsKey = await axios.get(webSocketDebuggerUrl);
+    let browser = await puppeteer.connect({
+        browserWSEndpoint: wsKey.data.webSocketDebuggerUrl,
+        defaultViewport:null
+    });
+    try{
+        const pages = await browser.pages();
+        let currentPage = null
+        for (let i = 0; i < pages.length; i++) {
+            const page = pages[i];
+            const url = await page.url();
+            if (url.includes("notification")) {
+                currentPage = page;
+                await currentPage.bringToFront()
+                break;
+            }
+        }
+        let title = await currentPage.title()
+        console.log(index, "当前页面：", title)
+        // 获取所有具有类名 `.quests_verifyButton__GcXnP` 的元素
+        const elements = await currentPage.$$("#app-content > div > div > div > div.permissions-connect-choose-account__footer-container > div.page-container__footer > footer > button.button.btn--rounded.btn-primary.page-container__footer-button");
+
+        // 遍历元素并调用 `click` 方法
+        for (let i = 0; i < elements.length; i++) {
+            await elements[i].click();
+        }
+        //await currentPage.click('button:contains("Sign-In")');
+        console.log(index, "sign in OK!")
+    }
+    catch(e){
+        console.log(index, 'e==>', e.message)
+        await sleep(5000)
+    }
+    
+    //await sleep(3000)
+    await browser.disconnect()
+}
+
+
+if (commandString == "devmode"){
+    console.log(commandString, "...")
+    batchSwitchDevmode()
+}
+
+async function batchSwitchDevmode(){
+    for(let i = num1; i <= num2; i++){
+        let port = portBase + i
+        let webSocketDebuggerUrl = "http://127.0.0.1:" + port + "/json/version"
+        switchDevmode(i, port, webSocketDebuggerUrl)
+        //await sleep(100)
+    }
+}
+
+
+async function switchDevmode(index, port, webSocketDebuggerUrl) {
+    const result = await isPortTaken(port, '127.0.0.1')
+    if (result) {
+        console.log(index, result, port, "已启动！")
+    }
+    else {
+        return
+    }
+
+    let wsKey = await axios.get(webSocketDebuggerUrl);
+    let browser = await puppeteer.connect({
+        browserWSEndpoint: wsKey.data.webSocketDebuggerUrl,
+        defaultViewport:null
+    });
+    try{
+        let page = await browser.newPage()
+        const extensionUrl = `chrome://extensions/`;
+        await page.goto(extensionUrl, { waitUntil: 'load' });
+
+        const devModeToggle = await page.evaluateHandle(
+            'document.querySelector("body > extensions-manager").shadowRoot.querySelector("extensions-toolbar").shadowRoot.querySelector("#devMode")'
+          );
+          await devModeToggle.click();
+        console.log(index, "devMode switch OK!")
+    }
+    catch(e){
+        console.log(index, 'e==>', e.message)
+        await sleep(5000)
     }
     
     //await sleep(3000)
