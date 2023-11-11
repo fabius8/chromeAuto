@@ -2,15 +2,18 @@ import pyautogui
 import time
 from pynput import mouse, keyboard
 from pynput.mouse import Button, Controller
+import json
 
+config = json.load(open('config.json'))
 # 获取屏幕大小
+
 screenWidth, screenHeight = pyautogui.size()
 print(screenWidth, screenHeight)
 
 # 4K显示器设置一般放大到150%，因为下面的菜单需要再缩小一部分
-x_change = 0.65
-y_change = 0.64
-k = 1.5
+x_change = config["x_change"]
+y_change = config["y_change"]
+k = config["k"]
 
 screenWidth = screenWidth * x_change
 screenHeight = screenHeight * y_change
