@@ -34,12 +34,12 @@ class MyListener(mouse.Listener, keyboard.Listener):
 
     def on_click(self, x, y, button, pressed):
         #self.mouse_listener.stop()
-        print(x, y)
+        print("on_click", x, y, button, pressed)
         if (x > x_offset) or (y > y_offset):
             print("skip")
             return True
-        time.sleep(0.1)
-        if button == mouse.Button.left and pressed:
+        #time.sleep(0.1)
+        if button == mouse.Button.left and not pressed:
             print("follow click!", x, y)
             # 在所有窗口上点击相同的位置
             for i in range(1, 10):
@@ -51,6 +51,7 @@ class MyListener(mouse.Listener, keyboard.Listener):
                 #mymouse.release(Button.left)
                 time.sleep(0.1)
                 print(i, "click", click_x, click_y)
+            mymouse.position = (x, y)
 
     def on_press(self, key):
         if key == keyboard.Key.esc:
