@@ -133,12 +133,44 @@ def on_click(x, y, button, pressed):
 
 # 定义键盘监听函数
 def on_press(key):
-    if key == keyboard.Key.f9:  # 监听F9键按下事件
-        # 退出程序
-        print("exit...")
-        mouse_listener.stop()
-        keyboard_listener.stop()
-        return False
+    if isinstance(key, keyboard.KeyCode):
+        # 普通按键
+        print('普通按键:', key.char)
+        vk_code = ord(key.char)   # 获取按键对应的虚拟键码
+        print('键码', vk_code)
+        for handle in sorted_chrome_windows:
+            print("handle", handle)
+            if handle == sorted_chrome_windows[0]:
+                continue
+            win32api.SendMessage(handle, win32con.WM_CHAR, vk_code, 0)  # 发送按键按下消息
+            #win32api.SendMessage(handle, win32con.WM_KEYUP, vk_code, 0)  # 发送按键释放消息
+
+    elif key in [Key.enter, Key.shift, Key.ctrl_l, Key.alt_l, Key.f9, Key.backspace]:
+        # 特殊按键
+        print('special key {0} pressed'.format(key))
+        if key == Key.f9:  # 监听F9键按下事件
+            # 退出程序
+            print("exit...")
+            mouse_listener.stop()
+            keyboard_listener.stop()
+            return False
+        for handle in sorted_chrome_windows:
+            print("handle", handle)
+            if handle == sorted_chrome_windows[0]:
+                continue
+            if key == Key.enter:
+                win32api.SendMessage(handle, win32con.WM_KEYDOWN, win32con.VK_RETURN, 0)  # 发送按键按下消息
+                win32api.SendMessage(handle, win32con.WM_KEYUP, win32con.VK_RETURN, 0)  # 发送按键释放消息
+            if key == Key.backspace:
+                win32api.SendMessage(handle, win32con.WM_KEYDOWN, win32con.VK_BACK, 0)  # 发送按键按下消息
+                win32api.SendMessage(handle, win32con.WM_KEYUP, win32con.VK_BACK, 0)  # 发送按键释放消息
+
+    else:
+        # 其他按键
+        print('其他按键')
+
+
+
 
 def on_scroll(x, y, dx, dy):
     print('Scrolled {0} at {1}'.format(
