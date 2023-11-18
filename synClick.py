@@ -80,6 +80,17 @@ for hwnd in sorted_chrome_windows:
 
     #click(x + w // 2, y + h // 2)
     #time.sleep(1)
+    #wParam = win32api.MAKELONG(0, 120)
+    #lParam = win32api.MAKELONG(x + w // 2, y + h // 2)  # 计算鼠标位置参数
+    #win32api.SendMessage(hwnd, win32con.WM_MOUSEWHEEL, wParam, lParam)
+
+
+""" for handle in sorted_chrome_windows:
+    print("handle", handle)
+    print("follow scroll", -1 * 120)
+    win32gui.SetForegroundWindow(handle)
+    win32api.SendMessage(handle, win32con.WM_MOUSEWHEEL, 120, 0) """
+
 
 
 # 定义鼠标点击监听函数
@@ -110,7 +121,7 @@ def on_click(x, y, button, pressed):
             if handle == sorted_chrome_windows[0]:
                 continue
 
-            win32gui.SetForegroundWindow(handle)
+            #win32gui.SetForegroundWindow(handle)
             lParam = win32api.MAKELONG(x_related, y_related)  # 计算鼠标位置参数
             #win32gui.SendMessage(handle, win32con.WM_ACTIVATE, win32con.WA_ACTIVE, 0)
             win32api.SendMessage(handle, win32con.WM_LBUTTONDOWN, win32con.MK_LBUTTON, lParam)
@@ -129,8 +140,45 @@ def on_press(key):
         keyboard_listener.stop()
         return False
 
+def on_scroll(x, y, dx, dy):
+    print('Scrolled {0} at {1}'.format(
+        'down' if dy < 0 else 'up',
+        (x, y, dx, dy)))
+    rect = win32gui.GetWindowRect(sorted_chrome_windows[0])
+    rx = rect[0]
+    ry = rect[1]
+    rw = rect[2] - rx
+    rh = rect[3] - ry
+    
+    # 对位置和大小进行150%缩放
+    x_scaled = int(x / k)
+    y_scaled = int(y / k)
+    print(rx, ry, rw, rh, x_scaled, y_scaled)
+    if (x_scaled < rx) or (x_scaled > (rx + rw)) or (y_scaled < ry) or (y_scaled > (ry + rh)):
+        print("not win#1, skip")
+        return
+    
+    # 相对窗口位置
+    x_related = x_scaled - rx
+    y_related = y_scaled - ry
+    
+    for handle in sorted_chrome_windows:
+        print("handle", handle)
+        if handle == sorted_chrome_windows[0]:
+            continue
+        rect = win32gui.GetWindowRect(handle)
+        x = rect[0]
+        y = rect[1]
+        w = rect[2] - x
+        h = rect[3] - y
+        print("follow scroll", dy * 120)
+        win32gui.SetForegroundWindow(handle)
+        wParam = win32api.MAKELONG(0, dy*120)
+        lParam = win32api.MAKELONG(x + x_related, y + y_related)
+        win32api.SendMessage(handle, win32con.WM_MOUSEWHEEL, wParam, lParam)
+
 # 创建鼠标监听器
-mouse_listener = mouse.Listener(on_click=on_click)
+mouse_listener = mouse.Listener(on_click=on_click, on_scroll=on_scroll)
 mouse_listener.start()
 
 # 创建键盘监听器
