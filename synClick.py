@@ -66,7 +66,7 @@ from pynput.keyboard import Key, Controller
 kb = Controller()
 
 # 定义变量来保存上一次点击的位置
-last_click_position = None
+last_click_position = (0, 0)
 
 
 for hwnd in sorted_chrome_windows:
@@ -83,12 +83,12 @@ for hwnd in sorted_chrome_windows:
     print(rect)
     kb.press(Key.alt)
     kb.release(Key.alt)
-
+    
     #click(x + w // 2, y + h // 2)
     #time.sleep(1)
     #wParam = win32api.MAKELONG(0, 120)
     #lParam = win32api.MAKELONG(x + w // 2, y + h // 2)  # 计算鼠标位置参数
-    #win32api.SendMessage(hwnd, win32con.WM_MOUSEWHEEL, wParam, lParam)
+    #win32api.SendMessage(hwnd, win32con.WM_PASTE, 0, 0)
 
 
 """ for handle in sorted_chrome_windows:
@@ -171,21 +171,28 @@ def on_press(key):
             win32api.SendMessage(handle, win32con.WM_CHAR, vk_code, 0)  # 发送按键按下消息
             #win32api.SendMessage(handle, win32con.WM_KEYUP, vk_code, 0)  # 发送按键释放消息
         
+        # 
         if str(key) == r"'\x16'": # ctrl + v
             print("ctrl+v paste press")
             for handle in sorted_chrome_windows:
-                #print("handle", handle)
+                print("handle", handle)
                 if handle == sorted_chrome_windows[0]:
                     continue
-                win32gui.SetForegroundWindow(handle)
-                time.sleep(0.5)
-                #win32gui.ShowWindow(handle, win32con.WM_SHOWWINDOW)#显示窗口
+                #win32gui.SetForegroundWindow(handle)
                 # win32clipboard.OpenClipboard()
                 # data = win32clipboard.GetClipboardData(win32clipboard.CF_UNICODETEXT)
                 # print(data)
                 # win32clipboard.CloseClipboard()
-                #a = win32gui.SendMessage(handle, win32con.WM_PASTE, 0, "data")
-                #print(a)
+                # win32gui.SendMessage(handle, win32con.WM_PASTE, 0, "data")
+
+                win32api.SendMessage(handle, win32con.WM_KEYDOWN, win32con.VK_CONTROL, 0)  # 发送按键按下消息
+                win32api.SendMessage(handle, win32con.WM_KEYDOWN, 0x56, 0)
+                win32api.SendMessage(handle, win32con.WM_KEYUP, 0x56, 0)
+                win32api.SendMessage(handle, win32con.WM_KEYUP, win32con.VK_CONTROL, 0)  # 发送按键按下消息
+                #time.sleep(0.5)
+
+
+
 
     elif key in [Key.enter, Key.shift, Key.ctrl_l, Key.alt_l, Key.f9, Key.backspace]:
         # 特殊按键
@@ -211,9 +218,9 @@ def on_press(key):
             if (x_scaled < rx) or (x_scaled > (rx + rw)) or (y_scaled < ry) or (y_scaled > (ry + rh)):
                 print("not win#1, skip")
                 return
-                
+
         for handle in sorted_chrome_windows:
-            print("handle", handle)
+            #print("handle", handle)
             if handle == sorted_chrome_windows[0]:
                continue
             if key == Key.enter:
