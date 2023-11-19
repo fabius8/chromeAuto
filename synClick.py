@@ -6,6 +6,8 @@ import win32process
 import re
 import time
 import json
+import win32clipboard
+
 #import pyautogui
 
 config = json.load(open('config.json'))
@@ -63,6 +65,10 @@ from pynput import mouse, keyboard
 from pynput.keyboard import Key, Controller
 kb = Controller()
 
+# 定义变量来保存上一次点击的位置
+last_click_position = None
+
+
 for hwnd in sorted_chrome_windows:
     # 将焦点设置到Chrome窗口
     print(hwnd)
@@ -95,6 +101,11 @@ for hwnd in sorted_chrome_windows:
 
 # 定义鼠标点击监听函数
 def on_click(x, y, button, pressed):
+    global last_click_position
+    if pressed:
+        last_click_position = (x, y)
+        print(f"Clicked at {last_click_position}")
+
     if button == mouse.Button.left and not pressed:  # 监听鼠标左键按下事件
         print('鼠标左键按下，位置:', x, y)
         rect = win32gui.GetWindowRect(sorted_chrome_windows[0])
@@ -134,16 +145,47 @@ def on_click(x, y, button, pressed):
 # 定义键盘监听函数
 def on_press(key):
     if isinstance(key, keyboard.KeyCode):
+
+        rect = win32gui.GetWindowRect(sorted_chrome_windows[0])
+        rx = rect[0]
+        ry = rect[1]
+        rw = rect[2] - rx
+        rh = rect[3] - ry
+        
+        # 对位置和大小进行150%缩放
+        x_scaled = int(last_click_position[0] / k)
+        y_scaled = int(last_click_position[1] / k)
+        print(rx, ry, rw, rh, x_scaled, y_scaled)
+        if (x_scaled < rx) or (x_scaled > (rx + rw)) or (y_scaled < ry) or (y_scaled > (ry + rh)):
+            print("not win#1, skip")
+            return
+        
         # 普通按键
         print('普通按键:', key.char)
         vk_code = ord(key.char)   # 获取按键对应的虚拟键码
         print('键码', vk_code)
         for handle in sorted_chrome_windows:
-            print("handle", handle)
+            #print("handle", handle)
             if handle == sorted_chrome_windows[0]:
                 continue
             win32api.SendMessage(handle, win32con.WM_CHAR, vk_code, 0)  # 发送按键按下消息
             #win32api.SendMessage(handle, win32con.WM_KEYUP, vk_code, 0)  # 发送按键释放消息
+        
+        if str(key) == r"'\x16'": # ctrl + v
+            print("ctrl+v paste press")
+            for handle in sorted_chrome_windows:
+                #print("handle", handle)
+                if handle == sorted_chrome_windows[0]:
+                    continue
+                win32gui.SetForegroundWindow(handle)
+                time.sleep(0.5)
+                #win32gui.ShowWindow(handle, win32con.WM_SHOWWINDOW)#显示窗口
+                # win32clipboard.OpenClipboard()
+                # data = win32clipboard.GetClipboardData(win32clipboard.CF_UNICODETEXT)
+                # print(data)
+                # win32clipboard.CloseClipboard()
+                #a = win32gui.SendMessage(handle, win32con.WM_PASTE, 0, "data")
+                #print(a)
 
     elif key in [Key.enter, Key.shift, Key.ctrl_l, Key.alt_l, Key.f9, Key.backspace]:
         # 特殊按键
@@ -154,10 +196,26 @@ def on_press(key):
             mouse_listener.stop()
             keyboard_listener.stop()
             return False
+
+        if key == Key.backspace or key == Key.enter:
+            rect = win32gui.GetWindowRect(sorted_chrome_windows[0])
+            rx = rect[0]
+            ry = rect[1]
+            rw = rect[2] - rx
+            rh = rect[3] - ry
+            
+            # 对位置和大小进行150%缩放
+            x_scaled = int(last_click_position[0] / k)
+            y_scaled = int(last_click_position[1] / k)
+            print(rx, ry, rw, rh, x_scaled, y_scaled)
+            if (x_scaled < rx) or (x_scaled > (rx + rw)) or (y_scaled < ry) or (y_scaled > (ry + rh)):
+                print("not win#1, skip")
+                return
+                
         for handle in sorted_chrome_windows:
             print("handle", handle)
             if handle == sorted_chrome_windows[0]:
-                continue
+               continue
             if key == Key.enter:
                 win32api.SendMessage(handle, win32con.WM_KEYDOWN, win32con.VK_RETURN, 0)  # 发送按键按下消息
                 win32api.SendMessage(handle, win32con.WM_KEYUP, win32con.VK_RETURN, 0)  # 发送按键释放消息
@@ -168,7 +226,6 @@ def on_press(key):
     else:
         # 其他按键
         print('其他按键')
-
 
 
 
