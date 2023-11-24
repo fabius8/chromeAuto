@@ -26,10 +26,15 @@ def sort_by_port(cmdline):
 def enum_chrome_windows(hwnd, _):
     classname = win32gui.GetClassName(hwnd)
     title = win32gui.GetWindowText(hwnd)
-    if classname == 'Chrome_WidgetWin_1' and title:
-        #print(title)
+    if classname == 'Chrome_WidgetWin_1' and title and win32gui.GetParent(hwnd) == 0: # 必须是父窗口
+        print(title)
         chrome_windows.append(hwnd)
 
+def is_window_valid(hwnd):
+    return win32gui.IsWindow(hwnd)
+
+def filter_invalid_windows(chrome_windows):
+    return [hwnd for hwnd in chrome_windows if is_window_valid(hwnd)]
 
 # def click(x, y):
 #     print(x, y)
@@ -67,11 +72,12 @@ kb = Controller()
 
 # 定义变量来保存上一次点击的位置
 last_click_position = (0, 0)
-
+# 在程序开始时初始化一个变量来表示程序的暂停状态
+paused = False
 
 for hwnd in sorted_chrome_windows:
     # 将焦点设置到Chrome窗口
-    print(hwnd)
+    #print(hwnd)
     win32gui.SetForegroundWindow(hwnd)
 
     # 获取窗口的位置和大小
@@ -80,7 +86,7 @@ for hwnd in sorted_chrome_windows:
     y = rect[1]
     w = rect[2] - x
     h = rect[3] - y
-    print(rect)
+    #print(rect)
     kb.press(Key.alt)
     kb.release(Key.alt)
     
@@ -88,8 +94,9 @@ for hwnd in sorted_chrome_windows:
     #time.sleep(1)
     #wParam = win32api.MAKELONG(0, 120)
     #lParam = win32api.MAKELONG(x + w // 2, y + h // 2)  # 计算鼠标位置参数
-    #win32api.SendMessage(hwnd, win32con.WM_PASTE, 0, 0)
 
+sorted_chrome_windows = filter_invalid_windows(sorted_chrome_windows)
+print("filter:", sorted_chrome_windows)
 
 """ for handle in sorted_chrome_windows:
     print("handle", handle)
@@ -102,6 +109,9 @@ for hwnd in sorted_chrome_windows:
 # 定义鼠标点击监听函数
 def on_click(x, y, button, pressed):
     global last_click_position
+    if paused:
+        print("paused!")
+        return
     if pressed:
         last_click_position = (x, y)
         print(f"Clicked at {last_click_position}")
@@ -144,8 +154,11 @@ def on_click(x, y, button, pressed):
 
 # 定义键盘监听函数
 def on_press(key):
+    global paused
     if isinstance(key, keyboard.KeyCode):
-
+        if paused:
+            print("paused!")
+            return
         rect = win32gui.GetWindowRect(sorted_chrome_windows[0])
         rx = rect[0]
         ry = rect[1]
@@ -194,7 +207,7 @@ def on_press(key):
 
 
 
-    elif key in [Key.enter, Key.shift, Key.ctrl_l, Key.alt_l, Key.f9, Key.backspace]:
+    elif key in [Key.enter, Key.shift, Key.ctrl_l, Key.alt_l, Key.f9, Key.backspace, Key.esc]:
         # 特殊按键
         print('special key {0} pressed'.format(key))
         if key == Key.f9:  # 监听F9键按下事件
@@ -203,6 +216,15 @@ def on_press(key):
             mouse_listener.stop()
             keyboard_listener.stop()
             return False
+                # 切换暂停状态
+        if key == Key.esc:  # 监听ESC键按下事件
+            paused = not paused
+            if paused:
+                print("paused...")
+                return
+            else:
+                print("resumed...")
+                return
 
         if key == Key.backspace or key == Key.enter:
             rect = win32gui.GetWindowRect(sorted_chrome_windows[0])
@@ -237,6 +259,9 @@ def on_press(key):
 
 
 def on_scroll(x, y, dx, dy):
+    if paused:
+        print("paused!")
+        return
     print('Scrolled {0} at {1}'.format(
         'down' if dy < 0 else 'up',
         (x, y, dx, dy)))
