@@ -179,7 +179,7 @@ async function openURL(index, port, webSocketDebuggerUrl){
     else {
         return
     }
-
+    await randomSleep(1, 2000) 
     let wsKey = await axios.get(webSocketDebuggerUrl);
     let browser = await puppeteer.connect({
         browserWSEndpoint: wsKey.data.webSocketDebuggerUrl,
@@ -541,3 +541,92 @@ async function switchDevmode(index, port, webSocketDebuggerUrl) {
     //await sleep(3000)
     await browser.disconnect()
 }
+
+
+//==================
+if (commandString == "twlogin"){
+    console.log(commandString, "...")
+    batchTwLogin()
+}
+
+async function batchTwLogin(){
+    for(let i = num1; i <= num2; i++){
+        let port = portBase + i
+        let webSocketDebuggerUrl = "http://127.0.0.1:" + port + "/json/version"
+        TwLogin(i, port, webSocketDebuggerUrl)
+        //await sleep(100)
+    }
+}
+const fs = require('fs');
+let token_array = [];
+
+// 读取文件内容
+fs.readFile('twitter_token.txt', 'utf8', (err, data) => {
+  if (err) {
+    console.error(err);
+    return;
+  }
+
+  // 按行分割内容
+  const lines = data.split('\n');
+
+  // 创建一个空数组来保存参数
+
+  // 遍历每行内容
+  lines.forEach((line, index) => {
+    // 忽略空行
+    if (line.trim() === '') {
+      return;
+    }
+
+    // 按空格分割行内容
+    const [num, token] = line.split(' ');
+
+    // 将参数保存到数组中
+    token_array.push([num, token])
+    token_array = token_array.map(item => [item[0], item[1].replace('\r', '')]);
+
+  });
+
+  // 在这里可以对参数数组进行进一步处理或保存
+  console.log(token_array);
+});
+
+async function TwLogin(index, port, webSocketDebuggerUrl) {
+    const result = await isPortTaken(port, '127.0.0.1')
+    if (result) {
+        console.log(index, result, port, "已启动！")
+    }
+    else {
+        return
+    }
+
+    let wsKey = await axios.get(webSocketDebuggerUrl);
+    let browser = await puppeteer.connect({
+        browserWSEndpoint: wsKey.data.webSocketDebuggerUrl,
+        defaultViewport:null
+    });
+    try{
+        let page = await browser.newPage()
+        const extensionUrl = "https://twitter.com";
+        await page.goto(extensionUrl, { waitUntil: 'load' });
+        const auth_token = token_array.find(item => item[0] === index.toString());
+        if (auth_token && auth_token.length > 1) {
+            await page.evaluate((token) => {
+                document.cookie = `auth_token=${token}; Max-Age=30000000; path=/`;
+            }, auth_token[1]);
+            await page.reload();
+            console.log(index, "twitter login OK!")
+        } else {
+            console.log(index, "auth_token not found")
+        }
+    }
+    catch(e){
+        console.log(index, 'e==>', e.message)
+        await sleep(5000)
+    }
+    
+    //await sleep(3000)
+    await browser.disconnect()
+}
+//==================
