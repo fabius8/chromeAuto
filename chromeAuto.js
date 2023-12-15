@@ -544,8 +544,45 @@ async function switchDevmode(index, port, webSocketDebuggerUrl) {
 
 
 //==================
+
+let token_array = [];
+const fs = require('fs').promises;
+
+async function readAndProcessFile() {
+  try {
+    const data = await fs.readFile('twitter_token.txt', 'utf8');
+
+    // 按行分割内容
+    const lines = data.split('\n');
+
+    // 创建一个空数组来保存参数
+    let token_array = [];
+
+    // 遍历每行内容
+    lines.forEach((line, index) => {
+      // 忽略空行
+      if (line.trim() === '') {
+        return;
+      }
+
+      // 按空格分割行内容
+      const [num, token] = line.split(' ');
+
+      // 将参数保存到数组中
+      token_array.push([num, token])
+    });
+
+    token_array = token_array.map(item => [item[0], item[1].replace('\r', '')]);
+
+    console.log(token_array);
+  } catch (err) {
+    console.error(err);
+  }
+}
+
 if (commandString == "twlogin"){
     console.log(commandString, "...")
+    readAndProcessFile()
     batchTwLogin()
 }
 
@@ -557,40 +594,6 @@ async function batchTwLogin(){
         //await sleep(100)
     }
 }
-const fs = require('fs');
-let token_array = [];
-
-// 读取文件内容
-fs.readFile('twitter_token.txt', 'utf8', (err, data) => {
-  if (err) {
-    console.error(err);
-    return;
-  }
-
-  // 按行分割内容
-  const lines = data.split('\n');
-
-  // 创建一个空数组来保存参数
-
-  // 遍历每行内容
-  lines.forEach((line, index) => {
-    // 忽略空行
-    if (line.trim() === '') {
-      return;
-    }
-
-    // 按空格分割行内容
-    const [num, token] = line.split(' ');
-
-    // 将参数保存到数组中
-    token_array.push([num, token])
-    token_array = token_array.map(item => [item[0], item[1].replace('\r', '')]);
-
-  });
-
-  // 在这里可以对参数数组进行进一步处理或保存
-  console.log(token_array);
-});
 
 async function TwLogin(index, port, webSocketDebuggerUrl) {
     const result = await isPortTaken(port, '127.0.0.1')
