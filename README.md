@@ -22,3 +22,6 @@
 ## 导入switchyOmega配置
 `node chromeAuto.js proxyLoad`
 
+## tw token 登录
+`node chromeAuto.js twlogin`
+
