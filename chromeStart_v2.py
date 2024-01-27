@@ -57,7 +57,8 @@ parameter = [
 ]
 
 for index, i  in enumerate(rangeList):
-    n = index
+    w = index
+    n = w%10
     if n <= 4:
         windows_x_position = n * chromeWidth
         windows_y_position = 0

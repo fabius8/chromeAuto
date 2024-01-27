@@ -18,7 +18,8 @@ const commandString = args[0];
 const varSting1 = args[1]
 const varSting2 = args[2]
 const varSting3 = args[3]
-console.log(commandString, varSting1, varSting2, varSting3)
+const varSting4 = args[4]
+console.log(commandString, varSting1, varSting2, varSting3, varSting4)
 
 function sleep(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
@@ -59,12 +60,12 @@ async function BatchMetamaskLogin(){
     for(let i = num1; i <= num2; i++){
         let port = portBase + i
         let webSocketDebuggerUrl = "http://127.0.0.1:" + port + "/json/version"
-        metamaskLogin(i, port, webSocketDebuggerUrl)
+        metamaskLogin(i, port, webSocketDebuggerUrl, varSting1)
         //await sleep(100)
     }
 }
 
-async function metamaskLogin(index, port, webSocketDebuggerUrl){
+async function metamaskLogin(index, port, webSocketDebuggerUrl, varSting1){
     const result = await isPortTaken(port, '127.0.0.1')
     if (result) {
         console.log(index, result, port, "已启动！")
@@ -72,24 +73,31 @@ async function metamaskLogin(index, port, webSocketDebuggerUrl){
     else {
         return
     }
-    await randomSleep(1, 2000) 
+    if (varSting1 == null){
+        await randomSleep(1, 3000)
+    }else{
+        await randomSleep(1, parseInt(varSting1) * 1000)
+    }
     let wsKey = await axios.get(webSocketDebuggerUrl);
     let browser = await puppeteer.connect({
         browserWSEndpoint: wsKey.data.webSocketDebuggerUrl,
         defaultViewport:null
     });
-    let page = await browser.newPage()
-    const extensionUrl = metamask_url;
-    await page.goto(extensionUrl, { waitUntil: 'load' });
     try{
+        let page = await browser.newPage()
+        const extensionUrl = metamask_url;
+        await page.goto(extensionUrl, { waitUntil: 'load' });
+    
         await sleep(100)
         var input = await page.waitForSelector('input[id=password]', {visible: true, timeout:3000})
         await input.type(metamask_password);
         await sleep(100)
-        await Promise.all([
-            page.keyboard.press('Enter'),
-            page.waitForNavigation({waitUntil: 'load'})
-        ]);
+        // await Promise.all([
+        //     page.keyboard.press('Enter'),
+        //     page.waitForNavigation({waitUntil: 'load'})
+        // ]);
+        await page.keyboard.press('Enter'),
+
         console.log("第", index, "个", "metamask 已解锁！")
     }catch(e){
         console.log('e==>', e.message)
@@ -166,12 +174,12 @@ async function batchOpenURL(){
     for(let i = num1; i <= num2; i++){
         let port = portBase + i
         let webSocketDebuggerUrl = "http://127.0.0.1:" + port + "/json/version"
-        openURL(i, port, webSocketDebuggerUrl)
+        openURL(i, port, webSocketDebuggerUrl, varSting1, varSting2, varSting3)
         //await sleep(100)
     }
 }
-
-async function openURL(index, port, webSocketDebuggerUrl){
+//varSting3 close time
+async function openURL(index, port, webSocketDebuggerUrl, varSting1, varSting2, varSting3){
     const result = await isPortTaken(port, '127.0.0.1')
     if (result) {
         console.log(index, result, port, "已启动！")
@@ -179,7 +187,11 @@ async function openURL(index, port, webSocketDebuggerUrl){
     else {
         return
     }
-    await randomSleep(1, 2000) 
+    if (varSting2 == null){
+        await randomSleep(1, 5000)
+    }else{
+        await randomSleep(1, parseInt(varSting2) * 1000)
+    }
     let wsKey = await axios.get(webSocketDebuggerUrl);
     let browser = await puppeteer.connect({
         browserWSEndpoint: wsKey.data.webSocketDebuggerUrl,
@@ -188,12 +200,17 @@ async function openURL(index, port, webSocketDebuggerUrl){
 
     let page = await browser.newPage()
     try{
-        await page.goto(varSting1, { waitUntil: 'load' });
+        //await page.goto(varSting1, { waitUntil: 'load' });
+        await page.goto(varSting1);
         console.log(index, '网页打开成功！');
-        await sleep(1000)
+        //await sleep(3000)
     }
     catch(e){
         console.log(e.message)
+    }
+    if (varSting3){
+        await sleep(parseInt(varSting3) * 1000)
+        await page.close()
     }
     await browser.disconnect()
 }
@@ -543,12 +560,12 @@ async function switchDevmode(index, port, webSocketDebuggerUrl) {
 }
 
 
-//==================
+//================== TW
 
 let token_array = [];
 const fs = require('fs').promises;
 
-async function readAndProcessFile() {
+async function readAndProcessFileTwitter() {
   try {
     const data = await fs.readFile('twitter_token.txt', 'utf8');
 
@@ -556,7 +573,6 @@ async function readAndProcessFile() {
     const lines = data.split('\n');
 
     // 创建一个空数组来保存参数
-    let token_array = [];
 
     // 遍历每行内容
     lines.forEach((line, index) => {
@@ -582,7 +598,7 @@ async function readAndProcessFile() {
 
 if (commandString == "twlogin"){
     console.log(commandString, "...")
-    readAndProcessFile()
+    readAndProcessFileTwitter()
     batchTwLogin()
 }
 
@@ -619,7 +635,7 @@ async function TwLogin(index, port, webSocketDebuggerUrl) {
                 document.cookie = `auth_token=${token}; Max-Age=30000000; path=/`;
             }, auth_token[1]);
             await page.reload();
-            console.log(index, "twitter login OK!")
+            console.log(index, auth_token[1], "twitter login OK!")
         } else {
             console.log(index, "auth_token not found")
         }
@@ -633,3 +649,93 @@ async function TwLogin(index, port, webSocketDebuggerUrl) {
     await browser.disconnect()
 }
 //==================
+
+//================== discord
+
+let discord_token_array = [];
+
+async function readAndProcessFileDiscord() {
+  try {
+    const data = await fs.readFile('discord_token.txt', 'utf8');
+
+    // 按行分割内容
+    const lines = data.split('\n');
+
+    // 创建一个空数组来保存参数
+
+    // 遍历每行内容
+    lines.forEach((line, index) => {
+      // 忽略空行
+      if (line.trim() === '') {
+        return;
+      }
+
+      // 按空格分割行内容
+      const [num, token] = line.split(' ');
+
+      // 将参数保存到数组中
+      discord_token_array.push([num, token])
+    });
+
+    discord_token_array = discord_token_array.map(item => [item[0], item[1].replace('\r', '')]);
+
+    console.log(discord_token_array);
+  } catch (err) {
+    console.error(err);
+  }
+}
+
+if (commandString == "dislogin"){
+    console.log(commandString, "...")
+    readAndProcessFileDiscord()
+    batchDiscordLogin()
+}
+
+async function batchDiscordLogin(){
+    for(let i = num1; i <= num2; i++){
+        let port = portBase + i
+        let webSocketDebuggerUrl = "http://127.0.0.1:" + port + "/json/version"
+        discordLogin(i, port, webSocketDebuggerUrl)
+        //await sleep(100)
+    }
+}
+
+async function discordLogin(index, port, webSocketDebuggerUrl) {
+    const result = await isPortTaken(port, '127.0.0.1')
+    if (result) {
+        console.log(index, result, port, "已启动！")
+    }
+    else {
+        return
+    }
+
+    let wsKey = await axios.get(webSocketDebuggerUrl);
+    let browser = await puppeteer.connect({
+        browserWSEndpoint: wsKey.data.webSocketDebuggerUrl,
+        defaultViewport:null
+    });
+    try{
+        let page = await browser.newPage()
+        const extensionUrl = "https://discord.com/login";
+        await page.goto(extensionUrl, { waitUntil: 'load' });
+        const auth_token = discord_token_array.find(item => item[0] === index.toString());
+        if (auth_token && auth_token.length > 1) {
+            await page.evaluate((token) => {
+                document.body.appendChild(document.createElement('iframe')).contentWindow.localStorage.token = `"${token}"`;
+            }, auth_token[1]);
+            await page.reload();
+            console.log(index, "discord login OK!")
+        } else {
+            console.log(index, "auth_token not found")
+        }
+    }
+    catch(e){
+        console.log(index, 'e==>', e.message)
+        await sleep(5000)
+    }
+    
+    //await sleep(3000)
+    await browser.disconnect()
+}
+//==================
+
