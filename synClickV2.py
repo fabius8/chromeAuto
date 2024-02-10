@@ -217,7 +217,7 @@ def on_press(key):
             keyboard_listener.stop()
             return False
                 # 切换暂停状态
-        if key == Key.esc:  # 监听ESC键按下事件
+        if key == Key.f4:  # 监听f4键按下事件
             paused = not paused
             if paused:
                 print("paused...")
@@ -293,7 +293,7 @@ def on_scroll(x, y, dx, dy):
         w = rect[2] - x
         h = rect[3] - y
         #print("follow scroll", dy * 120)
-        win32gui.SetForegroundWindow(handle)
+        #win32gui.SetForegroundWindow(handle)
         wParam = win32api.MAKELONG(0, dy*120)
         lParam = win32api.MAKELONG(x + x_related, y + y_related)
         win32api.SendMessage(handle, win32con.WM_MOUSEWHEEL, wParam, lParam)

@@ -13,12 +13,12 @@ let portBase = 9200
 let num1 = 1
 let num2 = 300
 
-const args = process.argv.slice(2);
-const commandString = args[0];
-const varSting1 = args[1]
-const varSting2 = args[2]
-const varSting3 = args[3]
-const varSting4 = args[4]
+//const args = process.argv.slice(2);
+const commandString = process.argv[2];
+const varSting1 = process.argv[3]
+const varSting2 = process.argv[4]
+const varSting3 = process.argv[5]
+const varSting4 = process.argv[6]
 console.log(commandString, varSting1, varSting2, varSting3, varSting4)
 
 function sleep(ms) {
@@ -61,7 +61,6 @@ async function BatchMetamaskLogin(){
         let port = portBase + i
         let webSocketDebuggerUrl = "http://127.0.0.1:" + port + "/json/version"
         metamaskLogin(i, port, webSocketDebuggerUrl, varSting1)
-        //await sleep(100)
     }
 }
 
@@ -89,22 +88,174 @@ async function metamaskLogin(index, port, webSocketDebuggerUrl, varSting1){
         await page.goto(extensionUrl, { waitUntil: 'load' });
     
         await sleep(100)
-        var input = await page.waitForSelector('input[id=password]', {visible: true, timeout:3000})
+        let selector = 'input[id=password]'
+        let input = await waitForSelectorWithRetry(page, selector, 2, 2000)
+        if (input == null){
+            browser.disconnect()
+            return
+        }
         await input.type(metamask_password);
         await sleep(100)
-        // await Promise.all([
-        //     page.keyboard.press('Enter'),
-        //     page.waitForNavigation({waitUntil: 'load'})
-        // ]);
         await page.keyboard.press('Enter'),
 
         console.log("第", index, "个", "metamask 已解锁！")
     }catch(e){
         console.log('e==>', e.message)
     }
-    await sleep(1000)
-    await browser.disconnect()
+    browser.disconnect()
 }
+
+async function waitForSelectorWithRetry(page, selector, maxRetries = 2, retryInterval = 1000) {
+    let retries = 0;
+    let input = null
+    while (retries < maxRetries) {
+      try {
+        input = await page.waitForSelector(selector, { timeout: 5000 });
+        //console.log('Element found!');
+        return input
+      } catch (error) {
+        // 如果超时或找不到元素，继续重试
+        console.log(`${selector} not found. Retrying... (Attempt ${retries + 1}/${maxRetries})`);
+        retries++;
+        await new Promise(resolve => setTimeout(resolve, retryInterval)); // 等待一段时间后重试
+      }
+    }
+    
+    console.log(`Maximum retries reached. ${selector} not found.`);
+    return null
+}
+
+////////////////////////////////////////////////////////////////////////////////////
+// metamask autoconfirm sign
+if (commandString == "mmAuto"){
+    console.log(commandString, "...")
+    BatchMetamaskAutoSign()
+}
+
+async function BatchMetamaskAutoSign(){
+    for(let i = num1; i <= num2; i++){
+        let port = portBase + i
+        let webSocketDebuggerUrl = "http://127.0.0.1:" + port + "/json/version"
+        metamaskAutoSign(i, port, webSocketDebuggerUrl, varSting1)
+        //await sleep(100)
+    }
+}
+
+async function metamaskAutoSign(index, port, webSocketDebuggerUrl, varSting1){
+    const result = await isPortTaken(port, '127.0.0.1')
+    if (result) {
+        console.log(index, result, port, "已启动！")
+    }
+    else {
+        return
+    }
+    if (varSting1 == null){
+        await randomSleep(1, 3 * 1000)
+    }else{
+        await randomSleep(1, parseInt(varSting1) * 1000)
+    }
+    let wsKey = await axios.get(webSocketDebuggerUrl);
+    let browser = await puppeteer.connect({
+        browserWSEndpoint: wsKey.data.webSocketDebuggerUrl,
+        defaultViewport:null
+    });
+    await monitorElement(index, browser);
+}
+
+async function monitorElement(index, browser) {
+    browser.on('targetcreated', async target => {
+        if (target.type() === 'page') {
+            const newPage = await target.page();
+            try{
+                await newPage.waitForNavigation({ timeout: 10000 }); // 等待新页面加载完成
+            }catch(e){
+                console.log(index, "页面导航超时:", e.message)
+            }
+            const url = newPage.url()
+            console.log('新页面已加载完毕:', url);
+
+            if (url.includes("notification")) {
+                const selectors = [
+                    '.request-signature__body', // 签名 page-container-footer-next
+                    '.choose-account-list', // 下一步 page-container-footer-next
+                    '.permission-approval-container__content', //连接 page-container-footer-next
+                    'button[data-testid="confirmation-submit-button"]',  // 可能网络
+                    '.confirm-page-container-content',
+                    '.box.token-allowance-container.page-container.box--flex-direction-row'
+                ];
+                
+                const promises = selectors.map(selector =>
+                    newPage.waitForSelector(selector, { timeout: 5000 }).then(() => selector).catch(() => null)
+                );
+                
+                try {
+                    let unfindCount = 0
+                    while (!newPage.isClosed()) {
+                        const matchedSelector = await Promise.race(promises.filter(p => p)); // 过滤掉为 null 的 Promise
+                        if (matchedSelector) {
+                            console.log(`匹配的选择器为: ${matchedSelector}`);
+                            const matchedIndex = selectors.indexOf(matchedSelector);
+                            console.log("序号：", matchedIndex);
+                            // 签名
+                            if((matchedIndex == 0) || (matchedIndex == 1) || (matchedIndex == 2)){
+                                const Button = 'button[data-testid="page-container-footer-next"]'; // 你想监控的元素的选择器
+                                await newPage.waitForSelector(Button, { visible: true, timeout: 3000 });
+                                await newPage.click(Button);
+                                console.log(index, "点击成功！");
+                                await sleep(3000)
+                            }else if(matchedIndex == 3){
+                                await newPage.click(matchedSelector);
+                                console.log(index, "切换网络成功！");
+                                await sleep(3000)
+                            }else if(matchedIndex == 4){ // ❌付款，这里跳出循环
+                                console.log(index, "付款页面，不处理！")
+                                break
+                            }else if(matchedIndex == 5){ // ❌授权，这里跳出循环
+                                console.log(index, "授权页面，不处理！")
+                                break
+                            }
+                        } else {
+                            console.error(index, `无法找到任何选择器或超时`);
+                            await sleep(3000)
+                            if (unfindCount < 3){
+                                unfindCount = unfindCount + 1 
+                            }else{
+                                break
+                            }
+                        }
+                    }
+                } catch (error) {
+                    console.error(index, `出现错误: ${error}`);
+                    await sleep(3000)
+                }
+            }
+        }
+        // 在这里可以对新页面进行操作
+    });
+}
+
+
+// async function monitorElement(page, buttonXPath) {
+//     const checkElement = async () => {
+//         await page.reload({ waitUntil: "networkidle0" });
+//         console.log("aaaa")
+
+//         const buttons = await page.$x(buttonXPath);
+//         console.log("cccc")
+//         if (buttons.length > 0) {
+//             console.log(`Element found on ${page.url()}`);
+//             console.log("bbbb")
+//             await buttons[0].click();
+//         } else {
+//             console.log(`Element not found on ${page.url()}, retrying...`);
+//             // 等待一段时间后再次检查
+//             setTimeout(checkElement, 5000); // 例如，每隔1秒检查一次
+//         }
+//     };
+//     checkElement();
+// }
+
+////////////////////////////////////////////////////////////////////////////////////
 
 // 命令处理
 if (commandString == "proxyLoad"){
@@ -192,27 +343,32 @@ async function openURL(index, port, webSocketDebuggerUrl, varSting1, varSting2, 
     }else{
         await randomSleep(1, parseInt(varSting2) * 1000)
     }
-    let wsKey = await axios.get(webSocketDebuggerUrl);
-    let browser = await puppeteer.connect({
-        browserWSEndpoint: wsKey.data.webSocketDebuggerUrl,
-        defaultViewport:null,
-    });
-
-    let page = await browser.newPage()
+    let browser = null
+    let page = null
     try{
+        let wsKey = await axios.get(webSocketDebuggerUrl);
+        browser = await puppeteer.connect({
+            browserWSEndpoint: wsKey.data.webSocketDebuggerUrl,
+            defaultViewport:null,
+        });
+
+        page = await browser.newPage()
+    
         //await page.goto(varSting1, { waitUntil: 'load' });
         await page.goto(varSting1);
-        console.log(index, '网页打开成功！');
+        console.log(index, '网页打开成功！', varSting1);
         //await sleep(3000)
+        if (varSting3){
+            await sleep(parseInt(varSting3) * 1000)
+            await page.close()
+        }
+    } catch (e) {
+        console.log(e.message);
+    } finally {
+        if (browser) {
+            browser.disconnect();
+        }
     }
-    catch(e){
-        console.log(e.message)
-    }
-    if (varSting3){
-        await sleep(parseInt(varSting3) * 1000)
-        await page.close()
-    }
-    await browser.disconnect()
 }
 
 
@@ -679,7 +835,7 @@ async function readAndProcessFileDiscord() {
 
     discord_token_array = discord_token_array.map(item => [item[0], item[1].replace('\r', '')]);
 
-    console.log(discord_token_array);
+    //console.log(discord_token_array);
   } catch (err) {
     console.error(err);
   }
@@ -715,11 +871,12 @@ async function discordLogin(index, port, webSocketDebuggerUrl) {
         defaultViewport:null
     });
     try{
-        let page = await browser.newPage()
-        const extensionUrl = "https://discord.com/login";
-        await page.goto(extensionUrl, { waitUntil: 'load' });
         const auth_token = discord_token_array.find(item => item[0] === index.toString());
+        
         if (auth_token && auth_token.length > 1) {
+            let page = await browser.newPage()
+            const extensionUrl = "https://discord.com/login";
+            await page.goto(extensionUrl, { waitUntil: 'load' });
             await page.evaluate((token) => {
                 document.body.appendChild(document.createElement('iframe')).contentWindow.localStorage.token = `"${token}"`;
             }, auth_token[1]);
@@ -731,11 +888,11 @@ async function discordLogin(index, port, webSocketDebuggerUrl) {
     }
     catch(e){
         console.log(index, 'e==>', e.message)
-        await sleep(5000)
+        //await sleep(5000)
     }
     
     //await sleep(3000)
-    await browser.disconnect()
+    browser.disconnect()
 }
 //==================
 
