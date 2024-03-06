@@ -207,7 +207,7 @@ def on_press(key):
 
 
 
-    elif key in [Key.enter, Key.shift, Key.ctrl_l, Key.alt_l, Key.f9, Key.backspace, Key.esc]:
+    elif key in [Key.enter, Key.shift, Key.ctrl_l, Key.alt_l, Key.f9, Key.f4, Key.backspace, Key.esc]:
         # 特殊按键
         print('special key {0} pressed'.format(key))
         if key == Key.f9:  # 监听F9键按下事件

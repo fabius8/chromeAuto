@@ -176,12 +176,12 @@ async function monitorElement(index, browser) {
 
             if (url.includes("notification")) {
                 const selectors = [
-                    '.request-signature__body', // 签名 page-container-footer-next
+                    '.request-signature__navigation', // 签名 page-container-footer-next
                     '.choose-account-list', // 下一步 page-container-footer-next
                     '.permission-approval-container__content', //连接 page-container-footer-next
                     'button[data-testid="confirmation-submit-button"]',  // 可能网络
-                    '.confirm-page-container-content',
-                    '.box.token-allowance-container.page-container.box--flex-direction-row'
+                    '.confirm-page-container-content', // 确认付款
+                    '.box.token-allowance-container.page-container.box--flex-direction-row'  // 授权金额
                 ];
                 
                 const promises = selectors.map(selector =>
