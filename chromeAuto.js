@@ -102,6 +102,7 @@ async function metamaskLogin(index, port, webSocketDebuggerUrl, varSting1){
     }catch(e){
         console.log('e==>', e.message)
     }
+    console.log("browser disconnecting...")
     browser.disconnect()
 }
 
@@ -370,6 +371,79 @@ async function openURL(index, port, webSocketDebuggerUrl, varSting1, varSting2, 
         }
     }
 }
+
+//==========================================
+if (commandString == "galxeTwMission"){
+    console.log(commandString, "...")
+    batchGalxeTwMission()
+}
+
+async function batchGalxeTwMission(){
+    for(let i = num1; i <= num2; i++){
+        let port = portBase + i
+        let webSocketDebuggerUrl = "http://127.0.0.1:" + port + "/json/version"
+        galxeTwMission(i, port, webSocketDebuggerUrl, varSting1, varSting2, varSting3)
+        //await sleep(100)
+    }
+}
+//varSting3 close time
+async function galxeTwMission(index, port, webSocketDebuggerUrl, varSting1, varSting2, varSting3){
+    const result = await isPortTaken(port, '127.0.0.1')
+    if (result) {
+        console.log(index, result, port, "已启动！")
+    }
+    else {
+        return
+    }
+    if (varSting2 == null){
+        await randomSleep(1, 5000)
+    }else{
+        await randomSleep(1, parseInt(varSting2) * 1000)
+    }
+    let browser = null
+    let page = null
+    try{
+        let wsKey = await axios.get(webSocketDebuggerUrl);
+        browser = await puppeteer.connect({
+            browserWSEndpoint: wsKey.data.webSocketDebuggerUrl,
+            defaultViewport:null,
+        });
+
+        const pages = await browser.pages();
+        let currentPage
+        for (let i = 0; i < pages.length; i++) {
+            const page = pages[i];
+            const url = await page.url();
+            if (url.includes("galxe")) {
+              currentPage = page;
+              await currentPage.bringToFront()
+              break;
+            }
+        }
+        let title = await currentPage.title()
+        console.log(index, "当前页面：", title)
+        
+        const elementsToClick = await currentPage.$$eval('.d-flex.height-100.width-100.click-area', elements => {
+            elements.forEach(element => {
+              const event = new MouseEvent('click', {
+                view: window,
+                bubbles: true,
+                cancelable: true
+              });
+              element.dispatchEvent(event);
+            });
+          });
+        
+    } catch (e) {
+        console.log(e.message);
+    } finally {
+        if (browser) {
+            browser.disconnect();
+        }
+    }
+}
+
+//==========================================
 
 
 
