@@ -51,6 +51,7 @@ function isPortTaken(port, host) {
     });
 }
 
+//===========================
 if (commandString == "metamaskLogin"){
     console.log(commandString, "...")
     BatchMetamaskLogin()
@@ -105,6 +106,63 @@ async function metamaskLogin(index, port, webSocketDebuggerUrl, varSting1){
     console.log("browser disconnecting...")
     browser.disconnect()
 }
+//===========================
+if (commandString == "okLogin"){
+    console.log(commandString, "...")
+    BatchOkLogin()
+}
+
+async function BatchOkLogin(){
+    for(let i = num1; i <= num2; i++){
+        let port = portBase + i
+        let webSocketDebuggerUrl = "http://127.0.0.1:" + port + "/json/version"
+        metamaskLogin(i, port, webSocketDebuggerUrl, varSting1)
+    }
+}
+
+async function metamaskLogin(index, port, webSocketDebuggerUrl, varSting1){
+    const result = await isPortTaken(port, '127.0.0.1')
+    if (result) {
+        console.log(index, result, port, "已启动！")
+    }
+    else {
+        return
+    }
+    if (varSting1 == null){
+        await randomSleep(1, 3000)
+    }else{
+        await randomSleep(1, parseInt(varSting1) * 1000)
+    }
+    let wsKey = await axios.get(webSocketDebuggerUrl);
+    let browser = await puppeteer.connect({
+        browserWSEndpoint: wsKey.data.webSocketDebuggerUrl,
+        defaultViewport:null
+    });
+    try{
+        let page = await browser.newPage()
+        const extensionUrl = "chrome-extension://mcohilncbfahbmgdjkbpemcciiolgcge/popup.html";
+        await page.goto(extensionUrl, { waitUntil: 'load' });
+    
+        await sleep(100)
+        let selector = 'input[type="password"]'
+        let input = await waitForSelectorWithRetry(page, selector, 2, 2000)
+        if (input == null){
+            browser.disconnect()
+            return
+        }
+        await input.type(metamask_password);
+        await sleep(100)
+        await page.keyboard.press('Enter'),
+        await sleep(100)
+        console.log("第", index, "个", "metamask 已解锁！")
+        await page.close()
+    }catch(e){
+        console.log('e==>', e.message)
+    }
+    console.log("browser disconnecting...")
+    browser.disconnect()
+}
+//===========================
 
 async function waitForSelectorWithRetry(page, selector, maxRetries = 2, retryInterval = 1000) {
     let retries = 0;
