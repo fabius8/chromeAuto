@@ -163,6 +163,124 @@ async function metamaskLogin(index, port, webSocketDebuggerUrl, varSting1){
     browser.disconnect()
 }
 //===========================
+if (commandString == "enableWallet"){
+    console.log(commandString, "...")
+    BatchEnableWallet()
+}
+
+async function BatchEnableWallet(){
+    for(let i = num1; i <= num2; i++){
+        let port = portBase + i
+        let webSocketDebuggerUrl = "http://127.0.0.1:" + port + "/json/version"
+        enableWallet(i, port, webSocketDebuggerUrl, varSting1, varSting2)
+    }
+}
+
+async function enableWallet(index, port, webSocketDebuggerUrl, varSting1, varSting2){
+    let enableWalletID = ""
+    const metamaskID = "nkbihfbeogaeaoehlefnkodbefgpgknn"
+    const okxID = "mcohilncbfahbmgdjkbpemcciiolgcge"
+    if(varSting1.includes("metamask")){
+        enableWalletID = metamaskID
+    }
+    if(varSting1.includes("okx")){
+        enableWalletID = okxID
+    }
+    const result = await isPortTaken(port, '127.0.0.1')
+    if (result) {
+        console.log(index, result, port, "已启动！")
+    }
+    else {
+        return
+    }
+    if (varSting2 == null){
+        await randomSleep(1, 3000)
+    }else{
+        await randomSleep(1, parseInt(varSting2) * 1000)
+    }
+    let wsKey = await axios.get(webSocketDebuggerUrl);
+    let browser = await puppeteer.connect({
+        browserWSEndpoint: wsKey.data.webSocketDebuggerUrl,
+        defaultViewport:null
+    });
+    try{
+        const page = await browser.newPage(); // 打开新页面
+        await page.goto(`chrome://extensions/?id=${enableWalletID}`); // 导航到目标页面
+        const enableToggle = await page.evaluate(() => {
+            const status = document.querySelector("body > extensions-manager").shadowRoot.querySelector("#viewManager > extensions-detail-view").shadowRoot.querySelector("#enableToggle").ariaPressed
+            if(status == 'false'){
+                document.querySelector("body > extensions-manager").shadowRoot.querySelector("#viewManager > extensions-detail-view").shadowRoot.querySelector("#enableToggle").click()
+            }
+            return status;
+        });
+        await sleep(100)
+        await page.close()
+    }catch(e){
+        console.log('e==>', e.message)
+    }
+    console.log("browser disconnecting...")
+    browser.disconnect()
+}
+//===========================
+if (commandString == "disenableWallet"){
+    console.log(commandString, "...")
+    BatchDisenableWallet()
+}
+
+async function BatchDisenableWallet(){
+    for(let i = num1; i <= num2; i++){
+        let port = portBase + i
+        let webSocketDebuggerUrl = "http://127.0.0.1:" + port + "/json/version"
+        disenableWallet(i, port, webSocketDebuggerUrl, varSting1, varSting2)
+    }
+}
+
+async function disenableWallet(index, port, webSocketDebuggerUrl, varSting1, varSting2){
+    let disenableWalletID = ""
+    const metamaskID = "nkbihfbeogaeaoehlefnkodbefgpgknn"
+    const okxID = "mcohilncbfahbmgdjkbpemcciiolgcge"
+    if(varSting1.includes("metamask")){
+        disenableWalletID = metamaskID
+    }
+    if(varSting1.includes("okx")){
+        disenableWalletID = okxID
+    }
+    const result = await isPortTaken(port, '127.0.0.1')
+    if (result) {
+        console.log(index, result, port, "已启动！")
+    }
+    else {
+        return
+    }
+    if (varSting2 == null){
+        await randomSleep(1, 3000)
+    }else{
+        await randomSleep(1, parseInt(varSting2) * 1000)
+    }
+    let wsKey = await axios.get(webSocketDebuggerUrl);
+    let browser = await puppeteer.connect({
+        browserWSEndpoint: wsKey.data.webSocketDebuggerUrl,
+        defaultViewport:null
+    });
+    try{
+        const page = await browser.newPage(); // 打开新页面
+        await page.goto(`chrome://extensions/?id=${disenableWalletID}`); // 导航到目标页面
+        const enableToggle = await page.evaluate(() => {
+            const status = document.querySelector("body > extensions-manager").shadowRoot.querySelector("#viewManager > extensions-detail-view").shadowRoot.querySelector("#enableToggle").ariaPressed
+            if(status == 'true'){
+                document.querySelector("body > extensions-manager").shadowRoot.querySelector("#viewManager > extensions-detail-view").shadowRoot.querySelector("#enableToggle").click()
+            }
+            return status;
+        });
+        await sleep(100)
+        await page.close()
+    }catch(e){
+        console.log('e==>', e.message)
+    }
+    console.log("browser disconnecting...")
+    browser.disconnect()
+}
+//===========================
 
 async function waitForSelectorWithRetry(page, selector, maxRetries = 2, retryInterval = 1000) {
     let retries = 0;
