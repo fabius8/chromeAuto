@@ -116,11 +116,11 @@ async function BatchOkLogin(){
     for(let i = num1; i <= num2; i++){
         let port = portBase + i
         let webSocketDebuggerUrl = "http://127.0.0.1:" + port + "/json/version"
-        metamaskLogin(i, port, webSocketDebuggerUrl, varSting1)
+        okLogin(i, port, webSocketDebuggerUrl, varSting1)
     }
 }
 
-async function metamaskLogin(index, port, webSocketDebuggerUrl, varSting1){
+async function okLogin(index, port, webSocketDebuggerUrl, varSting1){
     const result = await isPortTaken(port, '127.0.0.1')
     if (result) {
         console.log(index, result, port, "已启动！")
