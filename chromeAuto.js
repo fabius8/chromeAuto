@@ -154,7 +154,7 @@ async function okLogin(index, port, webSocketDebuggerUrl, varSting1){
         await sleep(100)
         await page.keyboard.press('Enter'),
         await sleep(100)
-        console.log("第", index, "个", "metamask 已解锁！")
+        console.log("第", index, "个", "okx 已解锁！")
         await page.close()
     }catch(e){
         console.log('e==>', e.message)
@@ -301,6 +301,166 @@ async function waitForSelectorWithRetry(page, selector, maxRetries = 2, retryInt
     console.log(`Maximum retries reached. ${selector} not found.`);
     return null
 }
+////////////////////////////////////////////////////////////////////////////////////
+//ok wallet YES
+if (commandString == "okYes"){
+    console.log(commandString, "...")
+    BatchOkYes()
+}
+
+async function BatchOkYes(){
+    for(let i = num1; i <= num2; i++){
+        let port = portBase + i
+        let webSocketDebuggerUrl = "http://127.0.0.1:" + port + "/json/version"
+        okYes(i, port, webSocketDebuggerUrl, varSting1)
+        //await sleep(100)
+    }
+}
+
+async function okYes(index, port, webSocketDebuggerUrl, varSting1){
+    const result = await isPortTaken(port, '127.0.0.1')
+    if (result) {
+        console.log(index, result, port, "已启动！")
+    }
+    else {
+        return
+    }
+    if (varSting1 == null){
+        await randomSleep(1, 3 * 1000)
+    }else{
+        await randomSleep(1, parseInt(varSting1) * 1000)
+    }
+    let wsKey = await axios.get(webSocketDebuggerUrl);
+    let browser = await puppeteer.connect({
+        browserWSEndpoint: wsKey.data.webSocketDebuggerUrl,
+        defaultViewport:null
+    });
+
+    const pages = await browser.pages();
+    let currentPage
+    for (let i = 0; i < pages.length; i++) {
+        const page = pages[i];
+        const url = await page.url();
+        if (url.includes("notification") && (url.includes("mcohilncbfahbmgdjkbpemcciiolgcge"))) {
+            currentPage = page;
+            let title = await currentPage.title()
+            console.log(index, "当前页面：", title)
+            const Button = 'button[class="okui-btn btn-lg btn-fill-highlight mobile _action-button_1ntoe_1"]'; // 你想监控的元素的选择器
+            await currentPage.waitForSelector(Button, { visible: true, timeout: 3000 });
+            await currentPage.click(Button);
+            console.log(index, "点击成功！");
+            break;
+        }
+    }
+    console.log("browser disconnecting...")
+    browser.disconnect()
+}
+////////////////////////////////////////////////////////////////////////////////////
+// ok autoconfirm sign
+if (commandString == "okAuto"){
+    console.log(commandString, "...")
+    BatchOkAuto()
+}
+
+async function BatchOkAuto(){
+    for(let i = num1; i <= num2; i++){
+        let port = portBase + i
+        let webSocketDebuggerUrl = "http://127.0.0.1:" + port + "/json/version"
+        okAuto(i, port, webSocketDebuggerUrl, varSting1)
+        //await sleep(100)
+    }
+}
+
+async function okAuto(index, port, webSocketDebuggerUrl, varSting1){
+    const result = await isPortTaken(port, '127.0.0.1')
+    if (result) {
+        console.log(index, result, port, "已启动！")
+    }
+    else {
+        return
+    }
+    if (varSting1 == null){
+        await randomSleep(1, 3 * 1000)
+    }else{
+        await randomSleep(1, parseInt(varSting1) * 1000)
+    }
+    let wsKey = await axios.get(webSocketDebuggerUrl);
+    let browser = await puppeteer.connect({
+        browserWSEndpoint: wsKey.data.webSocketDebuggerUrl,
+        defaultViewport:null
+    });
+    await okMonitorElement(index, browser);
+}
+
+async function okMonitorElement(index, browser) {
+    browser.on('targetcreated', async target => {
+        if (target.type() === 'page') {
+            const newPage = await target.page();
+            try{
+                await newPage.waitForNavigation({ timeout: 10000 }); // 等待新页面加载完成
+            }catch(e){
+                console.log(index, "页面导航超时:", e.message)
+            }
+            const url = newPage.url()
+            console.log('新页面已加载完毕:', url);
+
+            if (url.includes("notification") && (url.includes("mcohilncbfahbmgdjkbpemcciiolgcge"))) {
+                const selectors = [
+                    '.page-container.permissions-connect', // 链接
+                    '._root_1wel2_1', // 签名
+                ];
+                
+                const promises = selectors.map(selector =>
+                    newPage.waitForSelector(selector, { timeout: 5000 }).then(() => selector).catch(() => null)
+                );
+                
+                try {
+                    let unfindCount = 0
+                    while (!newPage.isClosed()) {
+                        const matchedSelector = await Promise.race(promises.filter(p => p)); // 过滤掉为 null 的 Promise
+                        if (matchedSelector) {
+                            console.log(`匹配的选择器为: ${matchedSelector}`);
+                            const matchedIndex = selectors.indexOf(matchedSelector);
+                            console.log("序号：", matchedIndex);
+                            // 签名
+                            if((matchedIndex == 0)){
+                                const Button = 'button[class="okui-btn btn-lg btn-fill-highlight mobile _action-button_1ntoe_1"]'; // 你想监控的元素的选择器
+                                await newPage.waitForSelector(Button, { visible: true, timeout: 3000 });
+                                await newPage.click(Button);
+                                console.log(index, "点击成功！");
+                                await sleep(3000)
+                            }else if(matchedIndex == 3){
+                                await newPage.click(matchedSelector);
+                                console.log(index, "切换网络成功！");
+                                await sleep(3000)
+                            }else if(matchedIndex == 1){ // ❌付款，这里跳出循环
+                                console.log(index, "付款页面，不处理！")
+                                break
+                            }else if(matchedIndex == 1){ // ❌授权，这里跳出循环
+                                console.log(index, "授权页面，不处理！")
+                                break
+                            }
+                        } else {
+                            console.error(index, `无法找到任何选择器或超时`);
+                            await sleep(3000)
+                            if (unfindCount < 3){
+                                unfindCount = unfindCount + 1 
+                            }else{
+                                break
+                            }
+                        }
+                    }
+                } catch (error) {
+                    console.error(index, `出现错误: ${error}`);
+                    await sleep(3000)
+                }
+            }
+        }
+        // 在这里可以对新页面进行操作
+    });
+}
+
+
 
 ////////////////////////////////////////////////////////////////////////////////////
 // metamask autoconfirm sign
