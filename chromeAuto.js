@@ -50,7 +50,202 @@ function isPortTaken(port, host) {
       server.listen(port, host);
     });
 }
+////////////////////////////////////////////////////////////////////////////////////
+//ok wallet YES
+if (commandString == "keplrYes"){
+    console.log(commandString, "...")
+    BatchkeplrYes()
+}
 
+async function BatchkeplrYes(){
+    for(let i = num1; i <= num2; i++){
+        let port = portBase + i
+        let webSocketDebuggerUrl = "http://127.0.0.1:" + port + "/json/version"
+        keplrYes(i, port, webSocketDebuggerUrl, varSting1)
+        //await sleep(100)
+    }
+}
+
+async function keplrYes(index, port, webSocketDebuggerUrl, varSting1){
+    const result = await isPortTaken(port, '127.0.0.1')
+    if (result) {
+        console.log(index, result, port, "已启动！")
+    }
+    else {
+        return
+    }
+    if (varSting1 == null){
+        await randomSleep(1, 3 * 1000)
+    }else{
+        await randomSleep(1, parseInt(varSting1) * 1000)
+    }
+    let wsKey = await axios.get(webSocketDebuggerUrl);
+    let browser = await puppeteer.connect({
+        browserWSEndpoint: wsKey.data.webSocketDebuggerUrl,
+        defaultViewport:null
+    });
+
+    const pages = await browser.pages();
+    let currentPage
+    for (let i = 0; i < pages.length; i++) {
+        const page = pages[i];
+        const url = await page.url();
+        if (url.includes("dmkamcknogkgcdfhhbddcghachkejeap")) {
+            await page.evaluate(() => {
+                // 查找包含特定文本的按钮并点击
+                const buttons = document.querySelectorAll('button');
+                for (const button of buttons) {
+                  if (button.textContent.includes('Approve')) {
+                    button.click();
+                    break;
+                  }
+                }
+            });
+        }
+    }
+    console.log("browser disconnecting...")
+    browser.disconnect()
+}
+////////////////////////////////////////////////////////////////////////////////////
+//===========================
+if (commandString == "keplrLogin"){
+    console.log(commandString, "...")
+    BatchKeplrLogin()
+}
+
+async function BatchKeplrLogin(){
+    for(let i = num1; i <= num2; i++){
+        let port = portBase + i
+        let webSocketDebuggerUrl = "http://127.0.0.1:" + port + "/json/version"
+        keplrLogin(i, port, webSocketDebuggerUrl, varSting1)
+    }
+}
+
+async function keplrLogin(index, port, webSocketDebuggerUrl, varSting1){
+    const result = await isPortTaken(port, '127.0.0.1')
+    if (result) {
+        console.log(index, result, port, "已启动！")
+    }
+    else {
+        return
+    }
+    if (varSting1 == null){
+        await randomSleep(1, 3000)
+    }else{
+        await randomSleep(1, parseInt(varSting1) * 1000)
+    }
+    let wsKey = await axios.get(webSocketDebuggerUrl);
+    let browser = await puppeteer.connect({
+        browserWSEndpoint: wsKey.data.webSocketDebuggerUrl,
+        defaultViewport:null
+    });
+    try{
+        let page = await browser.newPage()
+        const extensionUrl = "chrome-extension://dmkamcknogkgcdfhhbddcghachkejeap/popup.html";
+        await page.goto(extensionUrl, { waitUntil: 'load' });
+    
+        await sleep(100)
+        let selector = 'input[type=password]'
+        let input = await waitForSelectorWithRetry(page, selector, 2, 2000)
+        if (input == null){
+            browser.disconnect()
+            return
+        }
+        await input.type(metamask_password);
+        await sleep(100)
+        await page.keyboard.press('Enter'),
+
+        console.log("第", index, "个", "keplr 已解锁！")
+    }catch(e){
+        console.log('e==>', e.message)
+    }
+    console.log("browser disconnecting...")
+    browser.disconnect()
+}
+//===========================
+////////////////////////////////////////////////////////////////////////////////////
+// keplr autoconfirm sign
+if (commandString == "keplrAuto"){
+    console.log(commandString, "...")
+    BatchKeplrAuto()
+}
+
+async function BatchKeplrAuto(){
+    for(let i = num1; i <= num2; i++){
+        let port = portBase + i
+        let webSocketDebuggerUrl = "http://127.0.0.1:" + port + "/json/version"
+        keplrAuto(i, port, webSocketDebuggerUrl, varSting1)
+        //await sleep(100)
+    }
+}
+
+async function keplrAuto(index, port, webSocketDebuggerUrl, varSting1){
+    const result = await isPortTaken(port, '127.0.0.1')
+    if (result) {
+        console.log(index, result, port, "已启动！")
+    }
+    else {
+        return
+    }
+    if (varSting1 == null){
+        await randomSleep(1, 3 * 1000)
+    }else{
+        await randomSleep(1, parseInt(varSting1) * 1000)
+    }
+    let wsKey = await axios.get(webSocketDebuggerUrl);
+    let browser = await puppeteer.connect({
+        browserWSEndpoint: wsKey.data.webSocketDebuggerUrl,
+        defaultViewport:null
+    });
+    await keplrMonitorElement(index, browser);
+}
+
+async function keplrMonitorElement(index, browser) {
+    browser.on('targetcreated', async target => {
+        if (target.type() === 'page') {
+            const newPage = await target.page();
+            try{
+                await newPage.waitForNavigation({ timeout: 8000 }); // 等待新页面加载完成
+            }catch(e){
+                console.log(index, "页面导航超时:", e.message)
+            }
+            const url = newPage.url()
+            console.log('新页面已加载完毕:', url);
+
+            if (url.includes("dmkamcknogkgcdfhhbddcghachkejeap")) {
+                try {
+                    const Button = 'button.sc-jOrMOR.jYRHFp'; // 你想监控的元素的选择器
+                    await newPage.waitForSelector(Button, { visible: true, timeout: 3000 });
+                    await newPage.click(Button);
+                    console.log(index, "点击成功！");
+                    // const buttons = await newPage.evaluate(() => {
+                    //     const buttons = Array.from(document.querySelectorAll('button'));
+                    //     return buttons.map(button => button.textContent);
+                    // });
+                    // console.log('Buttons:', buttons);
+
+                    // await newPage.evaluate(() => {
+                    //     const buttons = document.querySelectorAll('button');
+                    //     for (const button of buttons) {
+                    //         if (button.textContent.includes('Approve')) {
+                    //             button.click();
+                    //             break;
+                    //         }
+                    //     }
+                    // });
+                } catch (error) {
+                    console.error(index, `出现错误: ${error}`);
+                    await sleep(3000);
+                }
+            }
+        }
+        // 在这里可以对新页面进行操作
+    });
+}
+
+
+
+////////////////////////////////////////////////////////////////////////////////////
 //===========================
 if (commandString == "metamaskLogin"){
     console.log(commandString, "...")
@@ -397,7 +592,7 @@ async function okMonitorElement(index, browser) {
         if (target.type() === 'page') {
             const newPage = await target.page();
             try{
-                await newPage.waitForNavigation({ timeout: 10000 }); // 等待新页面加载完成
+                await newPage.waitForNavigation({ timeout: 8000 }); // 等待新页面加载完成
             }catch(e){
                 console.log(index, "页面导航超时:", e.message)
             }
@@ -408,6 +603,7 @@ async function okMonitorElement(index, browser) {
                 const selectors = [
                     '.page-container.permissions-connect', // 链接
                     '._root_1wel2_1', // 签名
+                    '.app-content.os-win.browser-chrome',
                 ];
                 
                 const promises = selectors.map(selector =>
@@ -423,9 +619,9 @@ async function okMonitorElement(index, browser) {
                             const matchedIndex = selectors.indexOf(matchedSelector);
                             console.log("序号：", matchedIndex);
                             // 签名
-                            if((matchedIndex == 0)){
+                            if((matchedIndex == 0 || matchedIndex == 1 || matchedIndex == 2)){
                                 const Button = 'button[class="okui-btn btn-lg btn-fill-highlight mobile _action-button_1ntoe_1"]'; // 你想监控的元素的选择器
-                                await newPage.waitForSelector(Button, { visible: true, timeout: 3000 });
+                                await newPage.waitForSelector(Button, { visible: true, timeout: 8000 });
                                 await newPage.click(Button);
                                 console.log(index, "点击成功！");
                                 await sleep(3000)
@@ -1010,7 +1206,8 @@ async function closePage(index, port, webSocketDebuggerUrl, toCloseURL) {
     }
     
     //await sleep(3000)
-    await browser.disconnect()
+    console.log("browser disconnecting...")
+    browser.disconnect()
 }
 
 if (commandString == "signin"){
