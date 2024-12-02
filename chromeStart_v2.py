@@ -7,6 +7,10 @@ import zipfile
 import tkinter as tk
 from tkinter import messagebox
 
+import sys  # 添加到文件开头的导入部分
+
+
+
 def get_screen_size():
     """获取屏幕大小并根据缩放比例调整"""
     screen_width, screen_height = pyautogui.size()
@@ -24,6 +28,17 @@ def get_chrome_size(screen_width, screen_height):
 
 def get_range_list():
     """获取用户输入的范围列表"""
+    # 检查是否有命令行参数
+    if len(sys.argv) > 1:
+        try:
+            # 将命令行参数转换为整数
+            number = int(sys.argv[1])
+            return [number]
+        except ValueError:
+            print("无效的命令行参数，请输入有效的数字")
+            return []
+    
+    # 原有的交互式输入逻辑
     range_input = input("请输入一个或多个整数（以空格分隔）：").strip().split()
     if len(range_input) == 1:
         start = int(range_input[0])
@@ -133,6 +148,9 @@ def main():
     window_size = f"--window-size={chrome_width},{chrome_height}"
     
     range_list = get_range_list()
+    if not range_list:  # 如果range_list为空（可能是因为无效的命令行参数），直接返回
+        return
+    
     port_base = 9200
     
     proxies = read_proxies()
