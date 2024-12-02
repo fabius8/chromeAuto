@@ -108,6 +108,7 @@ print("filter:", sorted_chrome_windows)
 
 # 定义鼠标点击监听函数
 def on_click(x, y, button, pressed):
+    #time.sleep(0.1)
     global last_click_position
     if paused:
         print("paused!")
@@ -155,6 +156,8 @@ def on_click(x, y, button, pressed):
 # 定义键盘监听函数
 def on_press(key):
     global paused
+    #time.sleep(0.1)
+
     if isinstance(key, keyboard.KeyCode):
         if paused:
             print("paused!")
@@ -203,11 +206,7 @@ def on_press(key):
                 win32api.SendMessage(handle, win32con.WM_KEYUP, 0x56, 0)
                 win32api.SendMessage(handle, win32con.WM_KEYUP, win32con.VK_CONTROL, 0)  # 发送按键按下消息
                 #time.sleep(0.5)
-
-
-
-
-    elif key in [Key.enter, Key.shift, Key.ctrl_l, Key.alt_l, Key.f9, Key.f4, Key.backspace, Key.esc]:
+    elif key in [Key.enter, Key.shift, Key.ctrl_l, Key.alt_l, Key.f9, Key.f4, Key.backspace, Key.esc, Key.left, Key.right, Key.up, Key.down]:
         # 特殊按键
         print('special key {0} pressed'.format(key))
         if key == Key.f9:  # 监听F9键按下事件
@@ -251,6 +250,18 @@ def on_press(key):
             if key == Key.backspace:
                 win32api.SendMessage(handle, win32con.WM_KEYDOWN, win32con.VK_BACK, 0)  # 发送按键按下消息
                 win32api.SendMessage(handle, win32con.WM_KEYUP, win32con.VK_BACK, 0)  # 发送按键释放消息
+            if key == Key.left:
+                win32api.SendMessage(handle, win32con.WM_KEYDOWN, win32con.VK_LEFT, 0)  # 发送按键按下消息
+                win32api.SendMessage(handle, win32con.WM_KEYUP, win32con.VK_LEFT, 0)  # 发送按键释放消息
+            if key == Key.right:
+                win32api.SendMessage(handle, win32con.WM_KEYDOWN, win32con.VK_RIGHT, 0)  # 发送按键按下消息
+                win32api.SendMessage(handle, win32con.WM_KEYUP, win32con.VK_RIGHT, 0)  # 发送按键释放消息
+            if key == Key.up:
+                win32api.SendMessage(handle, win32con.WM_KEYDOWN, win32con.VK_UP, 0)  # 发送按键按下消息
+                win32api.SendMessage(handle, win32con.WM_KEYUP, win32con.VK_UP, 0)  # 发送按键释放消息
+            if key == Key.down:
+                win32api.SendMessage(handle, win32con.WM_KEYDOWN, win32con.VK_DOWN, 0)  # 发送按键按下消息
+                win32api.SendMessage(handle, win32con.WM_KEYUP, win32con.VK_DOWN, 0)  # 发送按键释放消息
 
     else:
         # 其他按键

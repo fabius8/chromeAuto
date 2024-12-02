@@ -242,11 +242,241 @@ async function keplrMonitorElement(index, browser) {
         // 在这里可以对新页面进行操作
     });
 }
+////////////////////////////////////////////////////////////////////////////////////
+//===========================
+if (commandString == "initiaLogin"){
+    console.log(commandString, "...")
+    BatchInitiaLogin()
+}
 
+async function BatchInitiaLogin(){
+    for(let i = num1; i <= num2; i++){
+        let port = portBase + i
+        let webSocketDebuggerUrl = "http://127.0.0.1:" + port + "/json/version"
+        initiaLogin(i, port, webSocketDebuggerUrl, varSting1)
+    }
+}
 
+async function initiaLogin(index, port, webSocketDebuggerUrl, varSting1){
+    const result = await isPortTaken(port, '127.0.0.1')
+    if (result) {
+        console.log(index, result, port, "已启动！")
+    }
+    else {
+        return
+    }
+    if (varSting1 == null){
+        await randomSleep(1, 3000)
+    }else{
+        await randomSleep(1, parseInt(varSting1) * 1000)
+    }
+    let wsKey = await axios.get(webSocketDebuggerUrl);
+    let browser = await puppeteer.connect({
+        browserWSEndpoint: wsKey.data.webSocketDebuggerUrl,
+        defaultViewport:null
+    });
+    try{
+        let page = await browser.newPage()
+        const extensionUrl = "chrome-extension://ffbceckpkpbcmgiaehlloocglmijnpmp/index.html";
+        await page.goto(extensionUrl, { waitUntil: 'load' });
+    
+        await sleep(100)
+        let selector = 'input[type=password]'
+        let input = await waitForSelectorWithRetry(page, selector, 2, 2000)
+        if (input == null){
+            browser.disconnect()
+            return
+        }
+        await input.type(metamask_password);
+        await sleep(100)
+        await page.keyboard.press('Enter'),
+
+        console.log("第", index, "个", "keplr 已解锁！")
+    }catch(e){
+        console.log('e==>', e.message)
+    }
+    console.log("browser disconnecting...")
+    browser.disconnect()
+}
+//===========================
+////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////
+if (commandString == "initiaAuto"){
+    console.log(commandString, "...")
+    BatchInitiaAuto()
+}
+
+async function BatchInitiaAuto(){
+    for(let i = num1; i <= num2; i++){
+        let port = portBase + i
+        let webSocketDebuggerUrl = "http://127.0.0.1:" + port + "/json/version"
+        initiaAuto(i, port, webSocketDebuggerUrl, varSting1)
+        //await sleep(100)
+    }
+}
+
+async function initiaAuto(index, port, webSocketDebuggerUrl, varSting1){
+    const result = await isPortTaken(port, '127.0.0.1')
+    if (result) {
+        console.log(index, result, port, "已启动！")
+    }
+    else {
+        return
+    }
+    if (varSting1 == null){
+        await randomSleep(1, 3 * 1000)
+    }else{
+        await randomSleep(1, parseInt(varSting1) * 1000)
+    }
+    let wsKey = await axios.get(webSocketDebuggerUrl);
+    let browser = await puppeteer.connect({
+        browserWSEndpoint: wsKey.data.webSocketDebuggerUrl,
+        defaultViewport:null
+    });
+    await initiaMonitorElement(index, browser);
+}
+
+async function initiaMonitorElement(index, browser) {
+    browser.on('targetcreated', async target => {
+        if (target.type() === 'page') {
+            const newPage = await target.page();
+            try{
+                await newPage.waitForNavigation({ timeout: 8000 }); // 等待新页面加载完成
+            }catch(e){
+                console.log(index, "页面导航超时:", e.message)
+            }
+            const url = newPage.url()
+            console.log('新页面已加载完毕:', url);
+
+            if (url.includes("ffbceckpkpbcmgiaehlloocglmijnpmp")) {
+                try {
+                    const Button = 'button[type="submit"]'; // 你想监控的元素的选择器
+                    await newPage.waitForSelector(Button, { visible: true, timeout: 3000 });
+                    await newPage.click(Button);
+                    console.log(index, "点击成功！");
+
+                } catch (error) {
+                    console.error(index, `出现错误: ${error}`);
+                    await sleep(3000);
+                }
+            }
+        }
+        // 在这里可以对新页面进行操作
+    });
+}
+////////////////////////////////////////////////////////////////////////////////////
 
 ////////////////////////////////////////////////////////////////////////////////////
 //===========================
+if (commandString == "tgQueryId"){
+    console.log(commandString, "...")
+    BatchTgQueryId()
+}
+
+async function BatchTgQueryId(){
+    for(let i = num1; i <= num2; i++){
+        let port = portBase + i
+        let webSocketDebuggerUrl = "http://127.0.0.1:" + port + "/json/version"
+        TgQueryId(i, port, webSocketDebuggerUrl, varSting1)
+    }
+}
+
+async function TgQueryId(index, port, webSocketDebuggerUrl, varSting1){
+    const result = await isPortTaken(port, '127.0.0.1')
+    if (result) {
+        console.log(index, result, port, "已启动！")
+    }
+    else {
+        return
+    }
+    if (varSting1 == null){
+        await randomSleep(1, 3000)
+    }else{
+        await randomSleep(1, parseInt(varSting1) * 1000)
+    }
+    let wsKey = await axios.get(webSocketDebuggerUrl);
+    let browser = await puppeteer.connect({
+        browserWSEndpoint: wsKey.data.webSocketDebuggerUrl,
+        defaultViewport:null
+    });
+    try{
+        const pages = await browser.pages();
+        const page = pages.find(page => page.url().includes('web.telegram.org'));
+
+        // 获取所有frame的sessionStorage
+        const allFramesData = await page.evaluate(async () => {
+            const getAllStorageData = (frame) => {
+                try {
+                    const data = {};
+                    Object.keys(frame.sessionStorage).forEach(key => {
+                        data[key] = frame.sessionStorage.getItem(key);
+                    });
+                    return data;
+                } catch (e) {
+                    return null;  // 如果无法访问则返回null
+                }
+            };
+
+            // 获取主frame的数据
+            const result = {
+                mainFrame: {
+                    url: window.location.href,
+                    sessionStorage: getAllStorageData(window)
+                },
+                frames: []
+            };
+
+            // 获取所有iframe的数据
+            const iframes = document.querySelectorAll('iframe');
+            for (const iframe of iframes) {
+                try {
+                    const frameData = {
+                        url: iframe.src,
+                        sessionStorage: getAllStorageData(iframe.contentWindow)
+                    };
+                    result.frames.push(frameData);
+                } catch (e) {
+                    console.error('无法访问iframe:', iframe.src);
+                }
+            }
+
+            return result;
+        });
+        const url = allFramesData.frames[0].url;
+        const searchParams = new URL(url).hash.substring(1); // 去掉 # 号
+        const params = new URLSearchParams(searchParams);
+        const tgWebAppData = params.get('tgWebAppData');
+        const decodedData = decodeURIComponent(tgWebAppData);
+        
+        // 解析 tgWebAppData 中的参数
+        const tgParams = new URLSearchParams(decodedData);
+        const queryId = tgParams.get('query_id');
+        const userData = JSON.parse(tgParams.get('user'));
+        //console.log('user:', userData);
+        console.log(index, " ", tgWebAppData);
+
+
+    }catch(e){
+        console.log('e==>', e.message)
+    }
+    console.log("browser disconnecting...")
+    browser.disconnect()
+
+}
+
+
+
+
+
+
+
+
+
+
+
+//===========================
+////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////
 if (commandString == "metamaskLogin"){
     console.log(commandString, "...")
     BatchMetamaskLogin()
@@ -540,7 +770,7 @@ async function okYes(index, port, webSocketDebuggerUrl, varSting1){
             currentPage = page;
             let title = await currentPage.title()
             console.log(index, "当前页面：", title)
-            const Button = 'button[class="okui-btn btn-lg btn-fill-highlight mobile _action-button_1ntoe_1"]'; // 你想监控的元素的选择器
+            const Button = 'button[class="okui-btn btn-lg btn-fill-highlight mobile _action-button_j3bvq_1"]'; // 你想监控的元素的选择器
             await currentPage.waitForSelector(Button, { visible: true, timeout: 3000 });
             await currentPage.click(Button);
             console.log(index, "点击成功！");
@@ -592,7 +822,7 @@ async function okMonitorElement(index, browser) {
         if (target.type() === 'page') {
             const newPage = await target.page();
             try{
-                await newPage.waitForNavigation({ timeout: 8000 }); // 等待新页面加载完成
+                await newPage.waitForNavigation({ timeout: 5000 }); // 等待新页面加载完成
             }catch(e){
                 console.log(index, "页面导航超时:", e.message)
             }
@@ -607,7 +837,7 @@ async function okMonitorElement(index, browser) {
                 ];
                 
                 const promises = selectors.map(selector =>
-                    newPage.waitForSelector(selector, { timeout: 5000 }).then(() => selector).catch(() => null)
+                    newPage.waitForSelector(selector, { timeout: 3000 }).then(() => selector).catch(() => null)
                 );
                 
                 try {
@@ -620,7 +850,7 @@ async function okMonitorElement(index, browser) {
                             console.log("序号：", matchedIndex);
                             // 签名
                             if((matchedIndex == 0 || matchedIndex == 1 || matchedIndex == 2)){
-                                const Button = 'button[class="okui-btn btn-lg btn-fill-highlight mobile _action-button_1ntoe_1"]'; // 你想监控的元素的选择器
+                                const Button = 'button[class="okui-btn btn-lg btn-fill-highlight mobile _action-button_j3bvq_1"]'; // 你想监控的元素的选择器
                                 await newPage.waitForSelector(Button, { visible: true, timeout: 8000 });
                                 await newPage.click(Button);
                                 console.log(index, "点击成功！");
