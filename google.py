@@ -10,6 +10,52 @@ import keyboard
 
 google_minimized = False
 
+class UndoEntry(tk.Entry):
+    """支持撤销/重做的Entry控件"""
+    def __init__(self, master=None, **kwargs):
+        super().__init__(master, **kwargs)
+        
+        # 绑定按键事件
+        self.bind('<Control-z>', self.undo)
+        self.bind('<Control-y>', self.redo)
+        self.bind('<Key>', self.record_change)
+        
+        # 初始化撤销/重做栈
+        self.undo_stack = []
+        self.redo_stack = []
+        self.last_value = ''
+        
+    def record_change(self, event=None):
+        """记录变更"""
+        if event.keysym not in ('Control_L', 'Control_R', 'z', 'y'):  # 忽略控制键
+            current = self.get()
+            if current != self.last_value:
+                self.undo_stack.append(self.last_value)
+                self.last_value = current
+                self.redo_stack.clear()  # 有新输入时清空重做栈
+    
+    def undo(self, event=None):
+        """撤销"""
+        if self.undo_stack:
+            current = self.get()
+            self.redo_stack.append(current)
+            previous = self.undo_stack.pop()
+            self.delete(0, tk.END)
+            self.insert(0, previous)
+            self.last_value = previous
+        return 'break'  # 防止事件继续传播
+    
+    def redo(self, event=None):
+        """重做"""
+        if self.redo_stack:
+            current = self.get()
+            self.undo_stack.append(current)
+            next_value = self.redo_stack.pop()
+            self.delete(0, tk.END)
+            self.insert(0, next_value)
+            self.last_value = next_value
+        return 'break'
+
 def log_message(message):
     log_text.insert(tk.END, message + "\n")
     log_text.see(tk.END)
@@ -145,7 +191,8 @@ def create_url_frame(parent, url_key, default_url, row):
     btn_open = tk.Button(frame, text=f"打开网页{row}", command=lambda: open_web(url_entries[row].get(), url_key))
     btn_open.pack(side=tk.LEFT)
 
-    url_entry = tk.Entry(frame, width=40)
+    # 使用新的 UndoEntry 替代原来的 Entry
+    url_entry = UndoEntry(frame, width=40)
     url_entry.insert(0, urls.get(url_key, default_url))
     url_entry.pack(side=tk.LEFT)
     url_entries[row] = url_entry
@@ -199,7 +246,7 @@ def create_command_frame(parent):
         frame.pack(anchor='w')
         
         # 命令输入框
-        cmd_entry = tk.Entry(frame, width=40)
+        cmd_entry = UndoEntry(frame, width=40)
         cmd_entry.insert(0, custom_commands[i])  # 从加载的配置中设置默认值
         cmd_entry.pack(side=tk.LEFT)
         cmd_entries.append(cmd_entry)
