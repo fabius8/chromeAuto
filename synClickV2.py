@@ -1,322 +1,449 @@
-import win32gui
-import win32con
 import win32api
-import psutil
+import win32gui
 import win32process
+import win32con
+import psutil
 import re
-import time
-import json
-import win32clipboard
-
-#import pyautogui
-
-config = json.load(open('config.json'))
-
-k = config["k"]
-
-def sort_by_port(cmdline):
-    port_str = next((param for param in cmdline if param.startswith('--remote-debugging-port=')), None)
-    if port_str:
-        port = int(re.search(r'\d+', port_str).group())
-        return port
-    else:
-        return 0 
-
-
-def enum_chrome_windows(hwnd, _):
-    classname = win32gui.GetClassName(hwnd)
-    title = win32gui.GetWindowText(hwnd)
-    if classname == 'Chrome_WidgetWin_1' and title and win32gui.GetParent(hwnd) == 0: # 必须是父窗口
-        print(title)
-        chrome_windows.append(hwnd)
-
-def is_window_valid(hwnd):
-    return win32gui.IsWindow(hwnd)
-
-def filter_invalid_windows(chrome_windows):
-    return [hwnd for hwnd in chrome_windows if is_window_valid(hwnd)]
-
-# def click(x, y):
-#     print(x, y)
-#     win32api.SetCursorPos((x, y))
-#     win32api.mouse_event(win32con.MOUSEEVENTF_LEFTDOWN, x, y, 0, 0)
-#     win32api.mouse_event(win32con.MOUSEEVENTF_LEFTUP, x, y, 0, 0)
-
-chrome_windows = []
-win32gui.EnumWindows(enum_chrome_windows, None)
-
-my_chrome_windows = []
-ports = []
-for hwnd in chrome_windows:
-    print(hwnd)
-    process = psutil.Process(win32process.GetWindowThreadProcessId(hwnd)[1])
-    if any("--remote-debugging-port" in arg for arg in process.cmdline()):
-        print(process.cmdline())
-        port_str = next((param for param in process.cmdline() if param.startswith('--remote-debugging-port=')), None)
-        if port_str:
-            port = int(re.search(r'\d+', port_str).group())
-            ports.append(port)
-            my_chrome_windows.append(hwnd)
-        else:
-            continue
-
-print(ports, my_chrome_windows)
-
-sorted_chrome_windows = [x for _, x in sorted(zip(ports, my_chrome_windows))]
-
-print(sorted_chrome_windows)
-    
 from pynput import mouse, keyboard
-from pynput.keyboard import Key, Controller
-kb = Controller()
+import threading
+from typing import Dict, Optional
+import time
 
-# 定义变量来保存上一次点击的位置
-last_click_position = (0, 0)
-# 在程序开始时初始化一个变量来表示程序的暂停状态
-paused = False
-
-for hwnd in sorted_chrome_windows:
-    # 将焦点设置到Chrome窗口
-    #print(hwnd)
-    win32gui.SetForegroundWindow(hwnd)
-
-    # 获取窗口的位置和大小
-    rect = win32gui.GetWindowRect(hwnd)
-    x = rect[0]
-    y = rect[1]
-    w = rect[2] - x
-    h = rect[3] - y
-    #print(rect)
-    kb.press(Key.alt)
-    kb.release(Key.alt)
-    
-    #click(x + w // 2, y + h // 2)
-    #time.sleep(1)
-    #wParam = win32api.MAKELONG(0, 120)
-    #lParam = win32api.MAKELONG(x + w // 2, y + h // 2)  # 计算鼠标位置参数
-
-sorted_chrome_windows = filter_invalid_windows(sorted_chrome_windows)
-print("filter:", sorted_chrome_windows)
-
-""" for handle in sorted_chrome_windows:
-    print("handle", handle)
-    print("follow scroll", -1 * 120)
-    win32gui.SetForegroundWindow(handle)
-    win32api.SendMessage(handle, win32con.WM_MOUSEWHEEL, 120, 0) """
-
-
-
-# 定义鼠标点击监听函数
-def on_click(x, y, button, pressed):
-    #time.sleep(0.1)
-    global last_click_position
-    if paused:
-        print("paused!")
-        return
-    if pressed:
-        last_click_position = (x, y)
-        print(f"Clicked at {last_click_position}")
-
-    if button == mouse.Button.left and not pressed:  # 监听鼠标左键按下事件
-        print('鼠标左键按下，位置:', x, y)
-        rect = win32gui.GetWindowRect(sorted_chrome_windows[0])
-        rx = rect[0]
-        ry = rect[1]
-        rw = rect[2] - rx
-        rh = rect[3] - ry
+class ChromeWindowMonitor:
+    def __init__(self):
+        self.windows: Dict[int, dict] = {}
+        self.running = True
+        self.mouse_listener = None
+        self.keyboard_listener = None
+        self.refresh_thread = None
+        self.active_window = None
         
-        # 对位置和大小进行150%缩放
-        x_scaled = int(x / k)
-        y_scaled = int(y / k)
-        print(rx, ry, rw, rh, x_scaled, y_scaled)
-        if (x_scaled < rx) or (x_scaled > (rx + rw)) or (y_scaled < ry) or (y_scaled > (ry + rh)):
-            print("not win#1, skip")
-            return
-        
-        # 相对窗口位置
-        x_related = x_scaled - rx
-        y_related = y_scaled - ry
+        # 添加日志控制 - 默认只开启错误日志
+        self.logging = {
+            'system': True,   # 系统日志开关
+            'info': True,     # 信息日志开关
+            'error': True,     # 错误日志开关
+            'debug': True     # 调试日志开关
+        }
 
-        # 在其他9个窗口相对位置执行鼠标按键操作
-        for handle in sorted_chrome_windows:
-            #print("handle", handle)
-            if handle == sorted_chrome_windows[0]:
-                continue
+    def log(self, level: str, message: str):
+        """统一的日志输出函数"""
+        if self.logging.get(level.lower(), False):
+            level_upper = level.upper()
+            print(f"[{level_upper}] {message}")
 
-            #win32gui.SetForegroundWindow(handle)
-            lParam = win32api.MAKELONG(x_related, y_related)  # 计算鼠标位置参数
-            #win32gui.SendMessage(handle, win32con.WM_ACTIVATE, win32con.WA_ACTIVE, 0)
-            win32api.SendMessage(handle, win32con.WM_LBUTTONDOWN, win32con.MK_LBUTTON, lParam)
-            win32api.SendMessage(handle, win32con.WM_LBUTTONUP, win32con.MK_LBUTTON, lParam)
+    def set_log_level(self, level: str, enabled: bool):
+        """设置日志级别开关"""
+        if level.lower() in self.logging:
+            self.logging[level.lower()] = enabled
+            self.log('system', f"日志级别 {level} 已{'启用' if enabled else '禁用'}")
 
-            #time.sleep(1)
-        
-        #win32api.SetCursorPos((x_related, y_related))
+    def toggle_all_logs(self, enabled: bool):
+        """统一设置所有日志开关"""
+        for level in self.logging:
+            self.logging[level] = enabled
+        self.log('system', f"所有日志已{'启用' if enabled else '禁用'}")
 
-# 定义键盘监听函数
-def on_press(key):
-    global paused
-    #time.sleep(0.1)
+    def get_process_cmdline(self, pid: int) -> list:
+        try:
+            process = psutil.Process(pid)
+            return process.cmdline()
+        except (psutil.NoSuchProcess, psutil.AccessDenied):
+            return []
 
-    if isinstance(key, keyboard.KeyCode):
-        if paused:
-            print("paused!")
-            return
-        rect = win32gui.GetWindowRect(sorted_chrome_windows[0])
-        rx = rect[0]
-        ry = rect[1]
-        rw = rect[2] - rx
-        rh = rect[3] - ry
-        
-        # 对位置和大小进行150%缩放
-        x_scaled = int(last_click_position[0] / k)
-        y_scaled = int(last_click_position[1] / k)
-        print(rx, ry, rw, rh, x_scaled, y_scaled)
-        if (x_scaled < rx) or (x_scaled > (rx + rw)) or (y_scaled < ry) or (y_scaled > (ry + rh)):
-            print("not win#1, skip")
-            return
-        
-        # 普通按键
-        print('普通按键:', key.char)
-        vk_code = ord(key.char)   # 获取按键对应的虚拟键码
-        print('键码', vk_code)
-        for handle in sorted_chrome_windows:
-            #print("handle", handle)
-            if handle == sorted_chrome_windows[0]:
-                continue
-            win32api.SendMessage(handle, win32con.WM_CHAR, vk_code, 0)  # 发送按键按下消息
-            #win32api.SendMessage(handle, win32con.WM_KEYUP, vk_code, 0)  # 发送按键释放消息
-        
-        # 
-        if str(key) == r"'\x16'": # ctrl + v
-            print("ctrl+v paste press")
-            for handle in sorted_chrome_windows:
-                #print("handle", handle)
-                if handle == sorted_chrome_windows[0]:
-                    continue
-                #win32gui.SetForegroundWindow(handle)
-                # win32clipboard.OpenClipboard()
-                # data = win32clipboard.GetClipboardData(win32clipboard.CF_UNICODETEXT)
-                # print(data)
-                # win32clipboard.CloseClipboard()
-                # win32gui.SendMessage(handle, win32con.WM_PASTE, 0, "data")
+    def get_window_at_point(self, x: int, y: int) -> Optional[dict]:
+        hwnd = win32gui.WindowFromPoint((x, y))
+        while hwnd:
+            if hwnd in self.windows:
+                return self.windows[hwnd]
+            hwnd = win32gui.GetParent(hwnd)
+        return None
 
-                win32api.SendMessage(handle, win32con.WM_KEYDOWN, win32con.VK_CONTROL, 0)  # 发送按键按下消息
-                win32api.SendMessage(handle, win32con.WM_KEYDOWN, 0x56, 0)
-                win32api.SendMessage(handle, win32con.WM_KEYUP, 0x56, 0)
-                win32api.SendMessage(handle, win32con.WM_KEYUP, win32con.VK_CONTROL, 0)  # 发送按键按下消息
-                #time.sleep(0.5)
-    elif key in [Key.enter, Key.shift, Key.ctrl_l, Key.alt_l, Key.f9, Key.f4, Key.backspace, Key.esc, Key.left, Key.right, Key.up, Key.down]:
-        # 特殊按键
-        print('special key {0} pressed'.format(key))
-        if key == Key.f9:  # 监听F9键按下事件
-            # 退出程序
-            print("exit...")
-            mouse_listener.stop()
-            keyboard_listener.stop()
-            return False
-                # 切换暂停状态
-        if key == Key.f4:  # 监听f4键按下事件
-            paused = not paused
-            if paused:
-                print("paused...")
-                return
-            else:
-                print("resumed...")
-                return
+    def get_window_rect(self, hwnd):
+        try:
+            left, top, right, bottom = win32gui.GetWindowRect(hwnd)
+            return {'left': left, 'top': top, 'right': right, 'bottom': bottom,
+                   'width': right - left, 'height': bottom - top}
+        except:
+            return None
 
-        if key == Key.backspace or key == Key.enter:
-            rect = win32gui.GetWindowRect(sorted_chrome_windows[0])
-            rx = rect[0]
-            ry = rect[1]
-            rw = rect[2] - rx
-            rh = rect[3] - ry
+    def get_first_child_window(self, hwnd):
+        try:
+            child_windows = self.windows[hwnd]['child_windows']
+            return child_windows[0] if child_windows else None
+        except (KeyError, IndexError):
+            return None
+
+    def is_matching_window(self, source_window, target_window):
+        # 如果是父窗口(parent_handle == 0)，只需要检查是否都是父窗口
+        if source_window['parent_handle'] == 0 and target_window['parent_handle'] == 0:
+            return True
             
-            # 对位置和大小进行150%缩放
-            x_scaled = int(last_click_position[0] / k)
-            y_scaled = int(last_click_position[1] / k)
-            print(rx, ry, rw, rh, x_scaled, y_scaled)
-            if (x_scaled < rx) or (x_scaled > (rx + rw)) or (y_scaled < ry) or (y_scaled > (ry + rh)):
-                print("not win#1, skip")
-                return
+        # 如果是子窗口，则需要检查class是否相同
+        if (source_window['parent_handle'] != 0 and 
+            target_window['parent_handle'] != 0 and 
+            source_window['class'] == target_window['class']):
+            return True
+            
+        return False
 
-        for handle in sorted_chrome_windows:
-            #print("handle", handle)
-            if handle == sorted_chrome_windows[0]:
-               continue
-            if key == Key.enter:
-                win32api.SendMessage(handle, win32con.WM_KEYDOWN, win32con.VK_RETURN, 0)  # 发送按键按下消息
-                win32api.SendMessage(handle, win32con.WM_KEYUP, win32con.VK_RETURN, 0)  # 发送按键释放消息
-            if key == Key.backspace:
-                win32api.SendMessage(handle, win32con.WM_KEYDOWN, win32con.VK_BACK, 0)  # 发送按键按下消息
-                win32api.SendMessage(handle, win32con.WM_KEYUP, win32con.VK_BACK, 0)  # 发送按键释放消息
-            if key == Key.left:
-                win32api.SendMessage(handle, win32con.WM_KEYDOWN, win32con.VK_LEFT, 0)  # 发送按键按下消息
-                win32api.SendMessage(handle, win32con.WM_KEYUP, win32con.VK_LEFT, 0)  # 发送按键释放消息
-            if key == Key.right:
-                win32api.SendMessage(handle, win32con.WM_KEYDOWN, win32con.VK_RIGHT, 0)  # 发送按键按下消息
-                win32api.SendMessage(handle, win32con.WM_KEYUP, win32con.VK_RIGHT, 0)  # 发送按键释放消息
-            if key == Key.up:
-                win32api.SendMessage(handle, win32con.WM_KEYDOWN, win32con.VK_UP, 0)  # 发送按键按下消息
-                win32api.SendMessage(handle, win32con.WM_KEYUP, win32con.VK_UP, 0)  # 发送按键释放消息
-            if key == Key.down:
-                win32api.SendMessage(handle, win32con.WM_KEYDOWN, win32con.VK_DOWN, 0)  # 发送按键按下消息
-                win32api.SendMessage(handle, win32con.WM_KEYUP, win32con.VK_DOWN, 0)  # 发送按键释放消息
+    def simulate_click(self, hwnd, rel_x, rel_y):
+        try:
+            lParam = win32api.MAKELONG(int(rel_x), int(rel_y))
+            win32api.SendMessage(hwnd, win32con.WM_LBUTTONDOWN, win32con.MK_LBUTTON, lParam)
+            win32api.SendMessage(hwnd, win32con.WM_LBUTTONUP, 0, lParam)
+        except Exception as e:
+            self.log('error', f"模拟点击失败: {e}")
 
-    else:
-        # 其他按键
-        print('其他按键')
+    def mirror_click(self, source_window, x, y):
+        if not source_window:
+            return
+                
+        source_rect = self.get_window_rect(source_window['handle'])
+        if not source_rect:
+            return
+                
+        rel_x_percent = (x - source_rect['left']) / source_rect['width']
+        rel_y_percent = (y - source_rect['top']) / source_rect['height']
+        source_userdata = source_window['userdata_number']
+        
+        for hwnd, window in self.windows.items():
+            if window['userdata_number'] == source_userdata:
+                continue
+                
+            target_window = window
+            if (source_window['parent_handle'] != 0 and 
+                target_window['parent_handle'] == 0):
+                child = self.get_first_child_window(hwnd)
+                if child:
+                    target_window = child
+                    
+            if self.is_matching_window(source_window, target_window):
+                target_rect = self.get_window_rect(target_window['handle'])
+                if target_rect:
+                    target_x = int(target_rect['width'] * rel_x_percent)
+                    target_y = int(target_rect['height'] * rel_y_percent)
+                    self.log('info', f"同步点击: 窗口 {target_window['title']} (USERDATA: {window['userdata_number']})")
+                    self.simulate_click(target_window['handle'], target_x, target_y)
 
+    def simulate_right_click(self, hwnd, rel_x, rel_y):
+        try:
+            lParam = win32api.MAKELONG(int(rel_x), int(rel_y))
+            win32api.SendMessage(hwnd, win32con.WM_RBUTTONDOWN, win32con.MK_RBUTTON, lParam)
+            win32api.SendMessage(hwnd, win32con.WM_RBUTTONUP, 0, lParam)
+        except Exception as e:
+            self.log('error', f"模拟右键点击失败: {e}")
 
+    def mirror_right_click(self, source_window, x, y):
+        if not source_window:
+            return
+                
+        source_rect = self.get_window_rect(source_window['handle'])
+        if not source_rect:
+            return
+                
+        rel_x_percent = (x - source_rect['left']) / source_rect['width']
+        rel_y_percent = (y - source_rect['top']) / source_rect['height']
+        source_userdata = source_window['userdata_number']
+        
+        for hwnd, window in self.windows.items():
+            if window['userdata_number'] == source_userdata:
+                continue
+                
+            target_window = window
+            if (source_window['parent_handle'] != 0 and 
+                target_window['parent_handle'] == 0):
+                child = self.get_first_child_window(hwnd)
+                if child:
+                    target_window = child
+                    
+            if self.is_matching_window(source_window, target_window):
+                target_rect = self.get_window_rect(target_window['handle'])
+                if target_rect:
+                    target_x = int(target_rect['width'] * rel_x_percent)
+                    target_y = int(target_rect['height'] * rel_y_percent)
+                    self.log('info', f"同步右键: 窗口 {target_window['title']} (USERDATA: {window['userdata_number']})")
+                    self.simulate_right_click(target_window['handle'], target_x, target_y)
 
-def on_scroll(x, y, dx, dy):
-    if paused:
-        print("paused!")
-        return
-    print('Scrolled {0} at {1}'.format(
-        'down' if dy < 0 else 'up',
-        (x, y, dx, dy)))
-    rect = win32gui.GetWindowRect(sorted_chrome_windows[0])
-    rx = rect[0]
-    ry = rect[1]
-    rw = rect[2] - rx
-    rh = rect[3] - ry
-    
-    # 对位置和大小进行150%缩放
-    x_scaled = int(x / k)
-    y_scaled = int(y / k)
-    print(rx, ry, rw, rh, x_scaled, y_scaled)
-    if (x_scaled < rx) or (x_scaled > (rx + rw)) or (y_scaled < ry) or (y_scaled > (ry + rh)):
-        print("not win#1, skip")
-        return
-    
-    # 相对窗口位置
-    x_related = x_scaled - rx
-    y_related = y_scaled - ry
-    
-    for handle in sorted_chrome_windows:
-        print("handle", handle)
-        if handle == sorted_chrome_windows[0]:
-            continue
-        rect = win32gui.GetWindowRect(handle)
-        x = rect[0]
-        y = rect[1]
-        w = rect[2] - x
-        h = rect[3] - y
-        #print("follow scroll", dy * 120)
-        #win32gui.SetForegroundWindow(handle)
-        wParam = win32api.MAKELONG(0, dy*120)
-        lParam = win32api.MAKELONG(x + x_related, y + y_related)
-        win32api.SendMessage(handle, win32con.WM_MOUSEWHEEL, wParam, lParam)
+    def simulate_scroll(self, hwnd, rel_x, rel_y, delta):
+        """模拟鼠标滚轮操作"""
+        try:
+            # 获取窗口位置
+            rect = win32gui.GetWindowRect(hwnd)
+            x = rect[0]
+            y = rect[1]
+            
+            # 构造消息参数，参考老代码的方式
+            wParam = win32api.MAKELONG(0, delta * 120)
+            lParam = win32api.MAKELONG(x + rel_x, y + rel_y)
+            
+            # 直接发送到主窗口
+            win32api.SendMessage(hwnd, win32con.WM_MOUSEWHEEL, wParam, lParam)
+            
+        except Exception as e:
+            self.log('error', f"模拟滚轮失败: {e}")
 
-# 创建鼠标监听器
-mouse_listener = mouse.Listener(on_click=on_click, on_scroll=on_scroll)
-mouse_listener.start()
+    def mirror_scroll(self, source_window, x, y, delta):
+        """镜像滚轮操作到其他窗口"""
+        if not source_window:
+            return
+                
+        source_rect = self.get_window_rect(source_window['handle'])
+        if not source_rect:
+            return
+                
+        rel_x_percent = (x - source_rect['left']) / source_rect['width']
+        rel_y_percent = (y - source_rect['top']) / source_rect['height']
+        source_userdata = source_window['userdata_number']
+        
+        for hwnd, window in self.windows.items():
+            if window['userdata_number'] == source_userdata:
+                continue
+                
+            target_window = window
+            if (source_window['parent_handle'] != 0 and 
+                target_window['parent_handle'] == 0):
+                child = self.get_first_child_window(hwnd)
+                if child:
+                    target_window = child
+                    
+            if self.is_matching_window(source_window, target_window):
+                target_rect = self.get_window_rect(target_window['handle'])
+                if target_rect:
+                    target_x = int(target_rect['width'] * rel_x_percent)
+                    target_y = int(target_rect['height'] * rel_y_percent)
+                    self.log('info', f"同步滚轮: 窗口 {target_window['title']} (USERDATA: {window['userdata_number']})")
+                    self.simulate_scroll(target_window['handle'], target_x, target_y, delta)
 
-# 创建键盘监听器
-keyboard_listener = keyboard.Listener(on_press=on_press)
-keyboard_listener.start()
+    def on_scroll(self, x, y, dx, dy):
+        """处理鼠标滚轮事件"""
+        window = self.get_window_at_point(x, y)
+        if not window:
+            return
+            
+        min_window = self.get_min_userdata_window()
+        if not min_window:
+            return
+            
+        if window['userdata_number'] == min_window['userdata_number']:
+            self.log('info', f"检测到滚轮: {window['title']}")
+            self.mirror_scroll(window, x, y, dy)
 
-# 进入消息循环
-mouse_listener.join()
-keyboard_listener.join()
+    def simulate_key(self, hwnd, key, is_press):
+        try:
+            special_keys = {
+                keyboard.Key.backspace: win32con.VK_BACK,
+                keyboard.Key.tab: win32con.VK_TAB,
+                keyboard.Key.enter: win32con.VK_RETURN,
+                keyboard.Key.shift: win32con.VK_SHIFT,
+                keyboard.Key.ctrl: win32con.VK_CONTROL,
+                keyboard.Key.alt: win32con.VK_MENU,
+                keyboard.Key.caps_lock: win32con.VK_CAPITAL,
+                keyboard.Key.esc: win32con.VK_ESCAPE,
+                keyboard.Key.space: win32con.VK_SPACE,
+                keyboard.Key.page_up: win32con.VK_PRIOR,
+                keyboard.Key.page_down: win32con.VK_NEXT,
+                keyboard.Key.end: win32con.VK_END,
+                keyboard.Key.home: win32con.VK_HOME,
+                keyboard.Key.left: win32con.VK_LEFT,
+                keyboard.Key.up: win32con.VK_UP,
+                keyboard.Key.right: win32con.VK_RIGHT,
+                keyboard.Key.down: win32con.VK_DOWN,
+                keyboard.Key.insert: win32con.VK_INSERT,
+                keyboard.Key.delete: win32con.VK_DELETE,
+            }
+
+            if isinstance(key, keyboard.Key):
+                vk_code = special_keys.get(key)
+                if vk_code is None:
+                    return
+            elif hasattr(key, 'vk'):
+                vk_code = key.vk
+            else:
+                vk_code = ord(str(key).upper())
+            
+            if is_press:
+                win32api.PostMessage(hwnd, win32con.WM_KEYDOWN, vk_code, 0)
+            else:
+                win32api.PostMessage(hwnd, win32con.WM_KEYUP, vk_code, 0)
+                
+        except Exception as e:
+            self.log('error', f"模拟按键失败: {str(e)}")
+
+    def mirror_key(self, key, is_press):
+        if not self.active_window:
+            return
+                
+        source_userdata = self.active_window['userdata_number']
+        min_window = self.get_min_userdata_window()
+        if not min_window or self.active_window['userdata_number'] != min_window['userdata_number']:
+            return
+                
+        for hwnd, window in self.windows.items():
+            if window['userdata_number'] == source_userdata:
+                continue
+                
+            target_window = window
+            if (self.active_window['parent_handle'] != 0 and 
+                target_window['parent_handle'] == 0):
+                child = self.get_first_child_window(hwnd)
+                if child:
+                    target_window = child
+                    
+            if self.is_matching_window(self.active_window, target_window):
+                if is_press:
+                    self.log('info', f"同步按键: {key} -> 窗口 {target_window['title']}")
+                self.simulate_key(target_window['handle'], key, is_press)
+
+    def get_min_userdata_window(self):
+        if not self.windows:
+            return None
+        return min(self.windows.values(), key=lambda w: int(w['userdata_number']))
+
+    def refresh_windows(self):
+        new_windows = {}
+        
+        def enum_window_callback(hwnd, _):
+            if win32gui.IsWindowVisible(hwnd):
+                class_name = win32gui.GetClassName(hwnd)
+                
+                if class_name == "Chrome_WidgetWin_1":
+                    _, pid = win32process.GetWindowThreadProcessId(hwnd)
+                    cmdline = self.get_process_cmdline(pid)
+                    
+                    userdata_cmd = next((cmd for cmd in cmdline 
+                                    if 'USERDATA' in cmd and '--user-data-dir=' in cmd), None)
+                    
+                    if userdata_cmd:
+                        match = re.search(r'USERDATA\\(\d+)', userdata_cmd)
+                        if match:
+                            placement = win32gui.GetWindowPlacement(hwnd)
+                            child_windows = []
+                            
+                            def enum_child_callback(child_hwnd, child_list):
+                                child_list.append({
+                                    'handle': child_hwnd,
+                                    'class': win32gui.GetClassName(child_hwnd),
+                                    'title': win32gui.GetWindowText(child_hwnd),
+                                    'parent_handle': hwnd
+                                })
+                                return True
+                            
+                            win32gui.EnumChildWindows(hwnd, enum_child_callback, child_windows)
+                            
+                            new_windows[hwnd] = {
+                                'handle': hwnd,
+                                'class': class_name,
+                                'title': win32gui.GetWindowText(hwnd),
+                                'pid': pid,
+                                'userdata_number': match.group(1),
+                                'userdata_path': userdata_cmd,
+                                'parent_handle': win32gui.GetParent(hwnd),
+                                'child_windows': child_windows,
+                                'is_enabled': win32gui.IsWindowEnabled(hwnd),
+                                'is_visible': win32gui.IsWindowVisible(hwnd),
+                                'is_minimized': placement[1] == win32con.SW_SHOWMINIMIZED,
+                                'is_maximized': placement[1] == win32con.SW_SHOWMAXIMIZED
+                            }
+                return True
+
+        win32gui.EnumWindows(enum_window_callback, None)
+        
+        if not self.windows and new_windows:
+            self.log('system', "Chrome窗口同步工具已启动")
+            self.log('system', f"已检测到 {len(new_windows)} 个Chrome窗口")
+            self.log('system', "按F9退出程序")
+        
+        self.windows = new_windows
+
+    def refresh_thread_func(self):
+        while self.running:
+            self.refresh_windows()
+            time.sleep(1)
+
+    def on_click(self, x, y, button, pressed):
+        if not pressed:
+            return
+            
+        window = self.get_window_at_point(x, y)
+        if not window:
+            return
+            
+        min_window = self.get_min_userdata_window()
+        if not min_window:
+            return
+            
+        if window['userdata_number'] == min_window['userdata_number']:
+            action = "左键" if button == mouse.Button.left else "右键"
+            self.log('info', f"检测到{action}点击: {window['title']}")
+            
+            if button == mouse.Button.left:
+                self.mirror_click(window, x, y)
+            elif button == mouse.Button.right:
+                self.mirror_right_click(window, x, y)
+
+    def on_key_press(self, key):
+        try:
+            hwnd = win32gui.GetForegroundWindow()
+            if hwnd in self.windows:
+                self.active_window = self.windows[hwnd]
+                self.mirror_key(key, True)
+        except Exception as e:
+            self.log('error', f"按键处理失败: {e}")
+
+    def on_key_release(self, key):
+        try:
+            if key == keyboard.Key.f9:
+                self.log('system', "正在退出程序...")
+                self.stop()
+                import sys
+                sys.exit(0)
+            hwnd = win32gui.GetForegroundWindow()
+            if hwnd in self.windows:
+                self.active_window = self.windows[hwnd]
+                if isinstance(key, keyboard.Key):
+                    self.mirror_key(key, False)
+        except Exception as e:
+            self.log('error', f"按键处理失败: {e}")
+
+    def start(self):
+        self.refresh_windows()
+        
+        self.refresh_thread = threading.Thread(target=self.refresh_thread_func)
+        self.refresh_thread.daemon = True
+        self.refresh_thread.start()
+        
+        # 更新鼠标监听器，添加滚轮事件
+        self.mouse_listener = mouse.Listener(
+            on_click=self.on_click,
+            on_scroll=self.on_scroll
+        )
+        self.mouse_listener.start()
+        
+        self.keyboard_listener = keyboard.Listener(
+            on_press=self.on_key_press,
+            on_release=self.on_key_release)
+        self.keyboard_listener.start()
+        
+        self.log('system', "开始监控Chrome窗口...")
+        
+        try:
+            self.keyboard_listener.join()
+            self.mouse_listener.join()
+        except KeyboardInterrupt:
+            self.stop()
+
+    def stop(self):
+        self.running = False
+        if self.mouse_listener:
+            self.mouse_listener.stop()
+        if self.keyboard_listener:
+            self.keyboard_listener.stop()
+        if self.refresh_thread:
+            self.refresh_thread.join()
+        self.log('system', "程序已停止运行")
+
+if __name__ == "__main__":
+    monitor = ChromeWindowMonitor()
+    # 默认只开启错误日志，其他都关闭
+    monitor.start()

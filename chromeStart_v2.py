@@ -6,10 +6,7 @@ import psutil
 import zipfile
 import tkinter as tk
 from tkinter import messagebox
-
-import sys  # 添加到文件开头的导入部分
-
-
+import sys
 
 def get_screen_size():
     """获取屏幕大小并根据缩放比例调整"""
@@ -20,25 +17,61 @@ def get_screen_size():
     screen_height *= y_change
     return int(screen_width), int(screen_height)
 
-def get_chrome_size(screen_width, screen_height):
-    """计算Chrome浏览器窗口大小"""
-    chrome_width = screen_width // 5
-    chrome_height = screen_height // 2
-    return chrome_width, chrome_height
+def calculate_layout(num_windows, screen_width, screen_height):
+    """计算最优的窗口布局"""
+    min_width = 400
+    min_height = 300
+    margin = 10
+    
+    best_layout = None
+    min_wasted_space = float('inf')
+    
+    for cols in range(1, num_windows + 1):
+        rows = (num_windows + cols - 1) // cols
+        
+        window_width = (screen_width - (cols + 1) * margin) // cols
+        window_height = (screen_height - (rows + 1) * margin) // rows
+        
+        if window_width < min_width or window_height < min_height:
+            continue
+            
+        wasted_space = (screen_width * screen_height) - (num_windows * window_width * window_height)
+        
+        if wasted_space < min_wasted_space:
+            min_wasted_space = wasted_space
+            best_layout = {
+                'rows': rows,
+                'cols': cols,
+                'window_width': window_width,
+                'window_height': window_height
+            }
+    
+    return best_layout
+
+def get_window_position(index, layout, margin=10):
+    """计算每个窗口的位置"""
+    cols = layout['cols']
+    window_width = layout['window_width']
+    window_height = layout['window_height']
+    
+    row = index // cols
+    col = index % cols
+    
+    x = margin + col * (window_width + margin)
+    y = margin + row * (window_height + margin)
+    
+    return x, y
 
 def get_range_list():
     """获取用户输入的范围列表"""
-    # 检查是否有命令行参数
     if len(sys.argv) > 1:
         try:
-            # 将命令行参数转换为整数
             number = int(sys.argv[1])
             return [number]
         except ValueError:
             print("无效的命令行参数，请输入有效的数字")
             return []
     
-    # 原有的交互式输入逻辑
     range_input = input("请输入一个或多个整数（以空格分隔）：").strip().split()
     if len(range_input) == 1:
         start = int(range_input[0])
@@ -46,17 +79,6 @@ def get_range_list():
         return list(range(start, end + 1))
     else:
         return [int(i) for i in range_input]
-
-def get_window_position(index, chrome_width, chrome_height):
-    """计算窗口位置"""
-    n = index % 10
-    if n <= 4:
-        x = n * chrome_width
-        y = 0
-    else:
-        x = (n - 5) * chrome_width
-        y = chrome_height
-    return x, y
 
 def extract_crx(crx_path, extract_dir):
     """解压 .crx 文件"""
@@ -74,7 +96,6 @@ def read_proxies():
     proxy_file = 'proxy.txt'
     try:
         with open(proxy_file, 'r', encoding='utf-8') as f:
-            # 过滤空行和去除空白
             proxies = [line.strip() for line in f if line.strip()]
             return proxies
     except FileNotFoundError:
@@ -87,17 +108,14 @@ def read_proxies():
 def launch_chrome(i, port, window_size, window_position, proxy):
     """启动Chrome实例"""
     app = "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe"
-    #app = "D:\\tools\chrome-win\\chrome.exe"
     cwd = os.getcwd()
     user_data_dir = f"--user-data-dir={cwd}\\USERDATA\\{i:04}"
     remote_debugging_port = f"--remote-debugging-port={port}"
 
-    # 插件目录
     plugins_dir = os.path.join(cwd, 'plugins')
     extracted_plugins_dir = os.path.join(cwd, 'extracted_plugins')
     os.makedirs(extracted_plugins_dir, exist_ok=True)
     
-    # 收集所有插件的路径
     extension_paths = []
     if os.path.exists(plugins_dir):
         for plugin_file in os.listdir(plugins_dir):
@@ -109,7 +127,6 @@ def launch_chrome(i, port, window_size, window_position, proxy):
                 if extract_crx(crx_path, plugin_extract_dir):
                     extension_paths.append(plugin_extract_dir)
     
-    # 使用 join 方法合并扩展路径
     extensions_cmd = f"--load-extension={','.join(extension_paths)}" if extension_paths else ""
     
     parameters = [
@@ -120,59 +137,55 @@ def launch_chrome(i, port, window_size, window_position, proxy):
         "--no-restore-session-state",
         "--disable-session-crashed-bubble",
         "--hide-crash-restore-bubble",
-        #"--no-proxy-server",
         "--disable-features=Translate",
-        #"--proxy-server=http://127.0.0.1:10971",
         window_position,
         user_data_dir,
         remote_debugging_port
     ]
 
-    # 如果有代理，添加代理参数
     if proxy:
         proxy_cmd = f"--proxy-server={proxy}"
         parameters.append(proxy_cmd)
 
-    # 如果有扩展，添加到参数中
     if extensions_cmd:
         parameters.append(extensions_cmd)
     
     chrome_args = [app] + parameters
     print(chrome_args)
     subprocess.Popen(chrome_args)
-    time.sleep(0.8)  # 等待 Chrome 加载完成
+    time.sleep(0.8)
 
 def main():
     screen_width, screen_height = get_screen_size()
-    chrome_width, chrome_height = get_chrome_size(screen_width, screen_height)
-    window_size = f"--window-size={chrome_width},{chrome_height}"
-    
     range_list = get_range_list()
-    if not range_list:  # 如果range_list为空（可能是因为无效的命令行参数），直接返回
+    if not range_list:
         return
     
+    layout = calculate_layout(len(range_list), screen_width, screen_height)
+    if not layout:
+        messagebox.showerror("错误", "无法找到合适的窗口布局！")
+        return
+    
+    window_size = f"--window-size={layout['window_width']},{layout['window_height']}"
     port_base = 9200
-    
     proxies = read_proxies()
-    
-    warning_shown = False  # 添加标志变量
+    warning_shown = False
 
     for index, i in enumerate(range_list):
         port = port_base + i
-        window_position = "--window-position={},{}".format(*get_window_position(index, chrome_width, chrome_height))
+        x, y = get_window_position(index, layout)
+        window_position = f"--window-position={x},{y}"
         
-        # 使用 if-else 判断，超出范围则弹窗
         if 0 < i <= len(proxies):
-            proxy = proxies[i - 1]  # 正常获取代理
+            proxy = proxies[i - 1]
         else:
-            if not warning_shown:  # 检查是否已经弹出过警告
-                # 弹出警告窗口
+            if not warning_shown:
                 root = tk.Tk()
-                root.withdraw()  # 隐藏主窗口
+                root.withdraw()
                 messagebox.showwarning("警告", "代理服务器未配置！")
-                root.destroy()  # 销毁窗口
-                warning_shown = True  # 设置标志为 True
-            proxy = None  # 设置为 None
+                root.destroy()
+                warning_shown = True
+            proxy = None
         
         launch_chrome(i, port, window_size, window_position, proxy)
 
