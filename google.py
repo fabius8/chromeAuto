@@ -5,7 +5,6 @@ import threading
 import pygetwindow as gw
 import json
 import os
-# 在文件开头添加导入
 import keyboard
 
 google_minimized = False
@@ -43,7 +42,7 @@ class UndoEntry(tk.Entry):
             self.delete(0, tk.END)
             self.insert(0, previous)
             self.last_value = previous
-        return 'break'  # 防止事件继续传播
+        return 'break'
     
     def redo(self, event=None):
         """重做"""
@@ -70,10 +69,8 @@ def run_command(command, success_msg, error_msg):
             log_message(f"{error_msg}: {e}")
     threading.Thread(target=execute).start()
 
-# 加载和保存配置的函数
-config_file = 'settings.json'  # 合并后的配置文件名称
+config_file = 'settings.json'
 
-# 修改加载配置函数
 def load_config():
     if os.path.exists(config_file):
         with open(config_file, 'r', encoding='utf-8') as f:
@@ -81,41 +78,43 @@ def load_config():
             return (
                 config.get('base_path', ""), 
                 config.get('urls', {}),
-                config.get('custom_commands', ['', '', ''])  # 加载自定义命令
+                config.get('custom_commands', ['', '', '']),
+                config.get('window_position', {'x': 100, 'y': 100})
             )
-    return "", {}, ['', '', '']
+    return "", {}, ['', '', ''], {'x': 100, 'y': 100}
 
-# 修改保存配置函数
-def save_config(base_path, urls, custom_commands):
+def save_config(base_path, urls, custom_commands, window_position=None):
+    if window_position is None:
+        window_position = {'x': root.winfo_x(), 'y': root.winfo_y()}
+    
     with open(config_file, 'w', encoding='utf-8') as f:
         json.dump({
             'base_path': base_path, 
             'urls': urls,
-            'custom_commands': custom_commands
+            'custom_commands': custom_commands,
+            'window_position': window_position
         }, f, ensure_ascii=False, indent=4)
 
-# 修改 select_path 函数
+def on_closing():
+    save_config(base_path, urls, custom_commands)
+    root.destroy()
+
 def select_path():
     path = filedialog.askdirectory()
     if path:
         global base_path
         base_path = path
-        save_config(base_path, urls, custom_commands)  # 添加 custom_commands 参数
+        save_config(base_path, urls, custom_commands)
         log_message(f"路径已设置为: {base_path}")
 
-# 初始化路径变量
-base_path, urls, custom_commands = load_config()
+base_path, urls, custom_commands, window_position = load_config()
 
-# 在其他函数定义的地方添加
 def press_f9():
     keyboard.press_and_release('F9')
     log_message("已触发F9按键")
 
-# 修改 command_custom 函数以记录最后使用的命令
 def command_custom(cmd, index=None):
     run_command(f"cd /d {base_path} && node chromeAuto.js {cmd}", "网页已打开", "打开网页失败")
-    
-    # 如果提供了索引，更新对应的命令
     if index is not None:
         custom_commands[index] = cmd
         save_config(base_path, urls, custom_commands)
@@ -138,7 +137,6 @@ def sync_window():
 def incognito_mode():
     run_command(f"cd /d {base_path} && python chromeStart_incognito.py", "无痕模式已启动", "启动无痕模式失败")
 
-# 修改 open_web 函数
 def open_web(url, key):
     if not url:
         log_message("URL不能为空")
@@ -146,8 +144,7 @@ def open_web(url, key):
         return
     
     urls[key] = url
-    save_config(base_path, urls, custom_commands)  # 添加 custom_commands 参数
-    
+    save_config(base_path, urls, custom_commands)
     run_command(f"cd /d {base_path} && node chromeAuto.js open {url}", "网页已打开", "打开网页失败")
 
 def close_web(url):
@@ -191,7 +188,6 @@ def create_url_frame(parent, url_key, default_url, row):
     btn_open = tk.Button(frame, text=f"打开网页{row}", command=lambda: open_web(url_entries[row].get(), url_key))
     btn_open.pack(side=tk.LEFT)
 
-    # 使用新的 UndoEntry 替代原来的 Entry
     url_entry = UndoEntry(frame, width=40)
     url_entry.insert(0, urls.get(url_key, default_url))
     url_entry.pack(side=tk.LEFT)
@@ -203,6 +199,8 @@ def create_url_frame(parent, url_key, default_url, row):
 # 创建主窗口
 root = tk.Tk()
 root.title("Google助手v1.0")
+root.geometry(f"+{window_position['x']}+{window_position['y']}")
+root.protocol("WM_DELETE_WINDOW", on_closing)
 
 # 添加选择路径按钮
 btn_select_path = tk.Button(root, text="选择文件路径", command=select_path)
@@ -228,30 +226,24 @@ for text, command in buttons:
     btn = tk.Button(frame1, text=text, command=command)
     btn.pack(side=tk.LEFT)
 
-# 修改创建命令框架的函数
 def create_command_frame(parent):
     command_frame = tk.Frame(parent)
     command_frame.pack(anchor='w')
 
-    # 创建标题标签
     title_label = tk.Label(command_frame, text="自定义命令：")
     title_label.pack(anchor='w')
 
-    # 创建命令输入框和按钮的列表，用于后续保存
     cmd_entries = []
 
-    # 创建三组命令输入框和按钮
     for i in range(3):
         frame = tk.Frame(command_frame)
         frame.pack(anchor='w')
         
-        # 命令输入框
         cmd_entry = UndoEntry(frame, width=40)
-        cmd_entry.insert(0, custom_commands[i])  # 从加载的配置中设置默认值
+        cmd_entry.insert(0, custom_commands[i])
         cmd_entry.pack(side=tk.LEFT)
         cmd_entries.append(cmd_entry)
         
-        # 执行按钮
         def create_command(entry, index):
             return lambda: command_custom(entry.get(), index)
         
@@ -262,9 +254,7 @@ def create_command_frame(parent):
         )
         btn_execute.pack(side=tk.LEFT)
 
-    # 保存按钮
     def save_custom_commands():
-        # 获取三个命令输入框的值
         cmds = [entry.get() for entry in cmd_entries]
         save_config(base_path, urls, cmds)
         log_message("自定义命令已保存")
@@ -272,11 +262,7 @@ def create_command_frame(parent):
     btn_save_commands = tk.Button(command_frame, text="保存命令", command=save_custom_commands)
     btn_save_commands.pack(anchor='w')
 
-# 在创建 URL 输入框之前调用这个函数
 create_command_frame(root)
-
-# ... 其余代码保持不变 ...
-
 
 # 创建URL输入框和按钮
 url_entries = [None] * 10
@@ -289,6 +275,20 @@ default_urls = [
 
 for i in range(10):
     create_url_frame(root, f'url{i}', default_urls[i], i)
+
+# 添加保存URL按钮
+def save_urls():
+    # 获取所有URL输入框的当前值
+    current_urls = {}
+    for i in range(10):
+        current_urls[f'url{i}'] = url_entries[i].get()
+    
+    # 保存到配置文件
+    save_config(base_path, current_urls, custom_commands)
+    log_message("所有URL已保存")
+
+btn_save_urls = tk.Button(root, text="保存所有URL", command=save_urls)
+btn_save_urls.pack(anchor='w')
 
 # 添加关闭所有谷歌浏览器按钮
 btn_close_all_google = tk.Button(root, text="关闭所有谷歌", command=close_all_google)
