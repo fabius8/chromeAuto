@@ -253,22 +253,72 @@ class ChromeWindowMonitor:
                 keyboard.Key.delete: win32con.VK_DELETE,
             }
 
+            # 添加调试日志
+            self.log('debug', f"模拟按键: key={key}, is_press={is_press}, hwnd={hwnd}")
+
+            # 处理特殊键
             if isinstance(key, keyboard.Key):
                 vk_code = special_keys.get(key)
                 if vk_code is None:
+                    self.log('debug', f"未找到特殊键映射: {key}")
                     return
+                char_code = None
+            # 处理普通按键
             elif hasattr(key, 'vk'):
                 vk_code = key.vk
+                # 对于普通字符，获取对应的字符
+                if hasattr(key, 'char') and key.char:
+                    char_code = ord(key.char)
+                else:
+                    char_code = vk_code
+            # 处理直接输入的字符
             else:
-                vk_code = ord(str(key).upper())
-            
+                char = str(key)
+                vk_code = ord(char.upper())
+                char_code = ord(char)
+
+            # 获取扫描码
+            scan_code = win32api.MapVirtualKey(vk_code, 0)
+            # 构造基础lparam
+            lparam = (scan_code << 16) | 1
+
+            # 检查窗口状态
+            if not win32gui.IsWindow(hwnd):
+                self.log('error', f"无效窗口句柄: {hwnd}")
+                return
+
+            # 获取窗口标题用于日志
+            try:
+                title = win32gui.GetWindowText(hwnd)
+            except:
+                title = "未知窗口"
+
             if is_press:
-                win32api.PostMessage(hwnd, win32con.WM_KEYDOWN, vk_code, 0)
-            else:
-                win32api.PostMessage(hwnd, win32con.WM_KEYUP, vk_code, 0)
+                # 发送按键按下消息
+                self.log('debug', f"发送按键按下: vk_code={vk_code}, hwnd={hwnd}, title={title}")
+                win32api.SendMessage(hwnd, win32con.WM_KEYDOWN, vk_code, lparam)
                 
+                # 对于普通字符，发送WM_CHAR消息
+                if char_code is not None and not isinstance(key, keyboard.Key):
+                    self.log('debug', f"发送字符消息: char_code={char_code}, hwnd={hwnd}")
+                    win32api.SendMessage(hwnd, win32con.WM_CHAR, char_code, lparam)
+            else:
+                # 按键释放时设置相应的标志位
+                lparam |= (1 << 31)  # 按键释放标志
+                self.log('debug', f"发送按键释放: vk_code={vk_code}, hwnd={hwnd}, title={title}")
+                win32api.SendMessage(hwnd, win32con.WM_KEYUP, vk_code, lparam)
+
+            # 处理组合键（Ctrl+C, Ctrl+V等）
+            if hasattr(key, 'char') and key.char:
+                ctrl_pressed = win32api.GetKeyState(win32con.VK_CONTROL) < 0
+                if ctrl_pressed:
+                    self.log('debug', f"检测到组合键: Ctrl + {key.char}")
+                    # 对于复制粘贴操作可以添加额外延时
+                    if key.char.lower() == 'v':
+                        time.sleep(0.1)
+
         except Exception as e:
-            self.log('error', f"模拟按键失败: {str(e)}")
+            self.log('error', f"模拟按键失败: hwnd={hwnd}, key={key}, error={str(e)}")
 
     def mirror_key(self, key, is_press):
         if not self.active_window:
@@ -387,6 +437,7 @@ class ChromeWindowMonitor:
             hwnd = win32gui.GetForegroundWindow()
             if hwnd in self.windows:
                 self.active_window = self.windows[hwnd]
+                self.log('debug', f"按键按下: key={key}, window={self.active_window['title']}")
                 self.mirror_key(key, True)
         except Exception as e:
             self.log('error', f"按键处理失败: {e}")
@@ -398,11 +449,12 @@ class ChromeWindowMonitor:
                 self.stop()
                 import sys
                 sys.exit(0)
+                
             hwnd = win32gui.GetForegroundWindow()
             if hwnd in self.windows:
                 self.active_window = self.windows[hwnd]
-                if isinstance(key, keyboard.Key):
-                    self.mirror_key(key, False)
+                self.log('debug', f"按键释放: key={key}, window={self.active_window['title']}")
+                self.mirror_key(key, False)
         except Exception as e:
             self.log('error', f"按键处理失败: {e}")
 
