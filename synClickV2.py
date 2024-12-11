@@ -173,13 +173,28 @@ class ChromeWindowMonitor:
             x = rect[0]
             y = rect[1]
             
-            # 构造消息参数，参考老代码的方式
-            wParam = win32api.MAKELONG(0, delta * 120)
+            # 检查 Ctrl 键状态并保持一致
+            ctrl_pressed = win32api.GetKeyState(win32con.VK_CONTROL) < 0
+            
+            # 构造消息参数
+            # 如果按住Ctrl键，添加MK_CONTROL标志
+            wParam = win32api.MAKELONG(
+                win32con.MK_CONTROL if ctrl_pressed else 0, 
+                delta * 120
+            )
             lParam = win32api.MAKELONG(x + rel_x, y + rel_y)
             
-            # 直接发送到主窗口
+            # 如果按住Ctrl键，先发送Ctrl按下消息
+            if ctrl_pressed:
+                win32api.SendMessage(hwnd, win32con.WM_KEYDOWN, win32con.VK_CONTROL, 0)
+                
+            # 发送滚轮消息
             win32api.SendMessage(hwnd, win32con.WM_MOUSEWHEEL, wParam, lParam)
             
+            # 如果按住Ctrl键，发送Ctrl释放消息
+            if ctrl_pressed:
+                win32api.SendMessage(hwnd, win32con.WM_KEYUP, win32con.VK_CONTROL, 0)
+                
         except Exception as e:
             self.log('error', f"模拟滚轮失败: {e}")
 
@@ -217,6 +232,9 @@ class ChromeWindowMonitor:
 
     def on_scroll(self, x, y, dx, dy):
         """处理鼠标滚轮事件"""
+        # 检查 Ctrl 键状态
+        ctrl_pressed = win32api.GetKeyState(win32con.VK_CONTROL) < 0
+        
         window = self.get_window_at_point(x, y)
         if not window:
             return
@@ -226,7 +244,8 @@ class ChromeWindowMonitor:
             return
             
         if window['userdata_number'] == min_window['userdata_number']:
-            self.log('info', f"检测到滚轮: {window['title']}")
+            action = "Ctrl+滚轮" if ctrl_pressed else "滚轮"
+            self.log('info', f"检测到{action}: {window['title']}")
             self.mirror_scroll(window, x, y, dy)
 
     def simulate_key(self, hwnd, key, is_press):
