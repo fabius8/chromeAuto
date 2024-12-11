@@ -34,6 +34,4 @@ for chrome_proc in chrome_procs:
     if any(search_string in arg for arg in chrome_proc.cmdline()):
         chrome_proc.terminate()
 
-print("Closing all Chrome instances...")
-time.sleep(2)
-print("All Chrome instances closed.")
+print("Closing all Chrome instances!")

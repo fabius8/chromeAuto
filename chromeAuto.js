@@ -2,6 +2,7 @@ const axios=require('axios');
 const puppeteer=require('puppeteer');
 const net = require('net');
 const path = require('path');
+const fs = require('fs');
 require("dotenv").config();
 
 const currentDirectory = process.cwd();
@@ -9,9 +10,6 @@ const relateDirectory = "pproxy\\switchomega_bak\\"
 const metamask_url = "chrome-extension://nkbihfbeogaeaoehlefnkodbefgpgknn/home.html"
 
 let metamask_password = process.env.METAMASK_PASSWORD
-let portBase = 9200
-let num1 = 1
-let num2 = 300
 
 //const args = process.argv.slice(2);
 const commandString = process.argv[2];
@@ -23,6 +21,39 @@ console.log(commandString, varSting1, varSting2, varSting3, varSting4)
 
 function sleep(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+// 读取并验证端口信息
+async function getValidPorts() {
+    try {
+        // 读取 chrome_ports.json
+        const portsData = JSON.parse(fs.readFileSync('chrome_ports.json', 'utf8'));
+        const validPorts = {};
+        let hasChanges = false;
+
+        // 检查每个端口是否可用
+        for (const [userNum, port] of Object.entries(portsData)) {
+            const isInUse = await isPortTaken(port, '127.0.0.1');
+            if (isInUse) {
+                validPorts[userNum] = port;
+            } else {
+                // 如果有端口被移除，标记有变化
+                hasChanges = true;
+                console.log(`Port ${port} for user ${userNum} is not in use, removing...`);
+            }
+        }
+
+        // 只在有变化时才写入文件
+        if (hasChanges) {
+            fs.writeFileSync('chrome_ports.json', JSON.stringify(validPorts, null, 2));
+            console.log('Port configuration updated');
+        }
+
+        return validPorts;
+    } catch (error) {
+        console.error('Error reading or processing ports:', error);
+        return {};
+    }
 }
 
 function randomSleep(min, max) {
@@ -50,6 +81,17 @@ function isPortTaken(port, host) {
       server.listen(port, host);
     });
 }
+
+// 通用批处理函数，支持可变参数
+async function batchProcess(handler, ...params) {
+    const validPorts = await getValidPorts();
+    
+    // 直接遍历 validPorts 对象
+    for (const [userNum, port] of Object.entries(validPorts)) {
+        const webSocketDebuggerUrl = `http://127.0.0.1:${port}/json/version`;
+        handler(parseInt(userNum), port, webSocketDebuggerUrl, ...params);
+    }
+}
 ////////////////////////////////////////////////////////////////////////////////////
 //ok wallet YES
 if (commandString == "keplrYes"){
@@ -57,13 +99,9 @@ if (commandString == "keplrYes"){
     BatchkeplrYes()
 }
 
+// 修改原有的批处理函数
 async function BatchkeplrYes(){
-    for(let i = num1; i <= num2; i++){
-        let port = portBase + i
-        let webSocketDebuggerUrl = "http://127.0.0.1:" + port + "/json/version"
-        keplrYes(i, port, webSocketDebuggerUrl, varSting1)
-        //await sleep(100)
-    }
+    batchProcess(keplrYes, varSting1)
 }
 
 async function keplrYes(index, port, webSocketDebuggerUrl, varSting1){
@@ -114,11 +152,7 @@ if (commandString == "keplrLogin"){
 }
 
 async function BatchKeplrLogin(){
-    for(let i = num1; i <= num2; i++){
-        let port = portBase + i
-        let webSocketDebuggerUrl = "http://127.0.0.1:" + port + "/json/version"
-        keplrLogin(i, port, webSocketDebuggerUrl, varSting1)
-    }
+    batchProcess(keplrLogin, varSting1)
 }
 
 async function keplrLogin(index, port, webSocketDebuggerUrl, varSting1){
@@ -171,12 +205,7 @@ if (commandString == "keplrAuto"){
 }
 
 async function BatchKeplrAuto(){
-    for(let i = num1; i <= num2; i++){
-        let port = portBase + i
-        let webSocketDebuggerUrl = "http://127.0.0.1:" + port + "/json/version"
-        keplrAuto(i, port, webSocketDebuggerUrl, varSting1)
-        //await sleep(100)
-    }
+    batchProcess(keplrAuto, varSting1)
 }
 
 async function keplrAuto(index, port, webSocketDebuggerUrl, varSting1){
@@ -250,11 +279,7 @@ if (commandString == "initiaLogin"){
 }
 
 async function BatchInitiaLogin(){
-    for(let i = num1; i <= num2; i++){
-        let port = portBase + i
-        let webSocketDebuggerUrl = "http://127.0.0.1:" + port + "/json/version"
-        initiaLogin(i, port, webSocketDebuggerUrl, varSting1)
-    }
+    batchProcess(initiaLogin, varSting1)
 }
 
 async function initiaLogin(index, port, webSocketDebuggerUrl, varSting1){
@@ -307,12 +332,7 @@ if (commandString == "initiaAuto"){
 }
 
 async function BatchInitiaAuto(){
-    for(let i = num1; i <= num2; i++){
-        let port = portBase + i
-        let webSocketDebuggerUrl = "http://127.0.0.1:" + port + "/json/version"
-        initiaAuto(i, port, webSocketDebuggerUrl, varSting1)
-        //await sleep(100)
-    }
+    batchProcess(initiaAuto, varSting1)
 }
 
 async function initiaAuto(index, port, webSocketDebuggerUrl, varSting1){
@@ -374,11 +394,7 @@ if (commandString == "tgQueryId"){
 }
 
 async function BatchTgQueryId(){
-    for(let i = num1; i <= num2; i++){
-        let port = portBase + i
-        let webSocketDebuggerUrl = "http://127.0.0.1:" + port + "/json/version"
-        TgQueryId(i, port, webSocketDebuggerUrl, varSting1)
-    }
+    batchProcess(TgQueryId, varSting1)
 }
 
 async function TgQueryId(index, port, webSocketDebuggerUrl, varSting1){
@@ -483,11 +499,7 @@ if (commandString == "metamaskLogin"){
 }
 
 async function BatchMetamaskLogin(){
-    for(let i = num1; i <= num2; i++){
-        let port = portBase + i
-        let webSocketDebuggerUrl = "http://127.0.0.1:" + port + "/json/version"
-        metamaskLogin(i, port, webSocketDebuggerUrl, varSting1)
-    }
+    batchProcess(metamaskLogin, varSting1)
 }
 
 async function metamaskLogin(index, port, webSocketDebuggerUrl, varSting1){
@@ -538,11 +550,7 @@ if (commandString == "okLogin"){
 }
 
 async function BatchOkLogin(){
-    for(let i = num1; i <= num2; i++){
-        let port = portBase + i
-        let webSocketDebuggerUrl = "http://127.0.0.1:" + port + "/json/version"
-        okLogin(i, port, webSocketDebuggerUrl, varSting1)
-    }
+    batchProcess(okLogin, varSting1)
 }
 
 async function okLogin(index, port, webSocketDebuggerUrl, varSting1){
@@ -594,11 +602,7 @@ if (commandString == "enableWallet"){
 }
 
 async function BatchEnableWallet(){
-    for(let i = num1; i <= num2; i++){
-        let port = portBase + i
-        let webSocketDebuggerUrl = "http://127.0.0.1:" + port + "/json/version"
-        enableWallet(i, port, webSocketDebuggerUrl, varSting1, varSting2)
-    }
+    batchProcess(enableWallet, varSting1, varSting2)
 }
 
 async function enableWallet(index, port, webSocketDebuggerUrl, varSting1, varSting2){
@@ -653,11 +657,7 @@ if (commandString == "disenableWallet"){
 }
 
 async function BatchDisenableWallet(){
-    for(let i = num1; i <= num2; i++){
-        let port = portBase + i
-        let webSocketDebuggerUrl = "http://127.0.0.1:" + port + "/json/version"
-        disenableWallet(i, port, webSocketDebuggerUrl, varSting1, varSting2)
-    }
+    batchProcess(disenableWallet, varSting1, varSting2)
 }
 
 async function disenableWallet(index, port, webSocketDebuggerUrl, varSting1, varSting2){
@@ -734,12 +734,7 @@ if (commandString == "okYes"){
 }
 
 async function BatchOkYes(){
-    for(let i = num1; i <= num2; i++){
-        let port = portBase + i
-        let webSocketDebuggerUrl = "http://127.0.0.1:" + port + "/json/version"
-        okYes(i, port, webSocketDebuggerUrl, varSting1)
-        //await sleep(100)
-    }
+    batchProcess(okYes, varSting1)
 }
 
 async function okYes(index, port, webSocketDebuggerUrl, varSting1){
@@ -788,12 +783,7 @@ if (commandString == "okAuto"){
 }
 
 async function BatchOkAuto(){
-    for(let i = num1; i <= num2; i++){
-        let port = portBase + i
-        let webSocketDebuggerUrl = "http://127.0.0.1:" + port + "/json/version"
-        okAuto(i, port, webSocketDebuggerUrl, varSting1)
-        //await sleep(100)
-    }
+    batchProcess(okAuto, varSting1)
 }
 
 async function okAuto(index, port, webSocketDebuggerUrl, varSting1){
@@ -896,12 +886,7 @@ if (commandString == "mmAuto"){
 }
 
 async function BatchMetamaskAutoSign(){
-    for(let i = num1; i <= num2; i++){
-        let port = portBase + i
-        let webSocketDebuggerUrl = "http://127.0.0.1:" + port + "/json/version"
-        metamaskAutoSign(i, port, webSocketDebuggerUrl, varSting1)
-        //await sleep(100)
-    }
+    batchProcess(metamaskAutoSign, varSting1)
 }
 
 async function metamaskAutoSign(index, port, webSocketDebuggerUrl, varSting1){
@@ -1027,12 +1012,7 @@ if (commandString == "proxyLoad"){
 }
 
 async function BatchProxyConfigLoad(){
-    for(let i = num1; i <= num2; i++){
-        let port = portBase + i
-        let webSocketDebuggerUrl = "http://127.0.0.1:" + port + "/json/version"
-        proxyConfigLoad(i, port, webSocketDebuggerUrl)
-        //await sleep(100)
-    }
+    batchProcess(proxyConfigLoad)
 }
 
 async function proxyConfigLoad(index, port, webSocketDebuggerUrl){
@@ -1085,12 +1065,7 @@ if (commandString == "open"){
 }
 
 async function batchOpenURL(){
-    for(let i = num1; i <= num2; i++){
-        let port = portBase + i
-        let webSocketDebuggerUrl = "http://127.0.0.1:" + port + "/json/version"
-        openURL(i, port, webSocketDebuggerUrl, varSting1, varSting2, varSting3)
-        //await sleep(100)
-    }
+    batchProcess(openURL, varSting1, varSting2, varSting3)
 }
 //varSting3 close time
 async function openURL(index, port, webSocketDebuggerUrl, varSting1, varSting2, varSting3){
@@ -1141,13 +1116,9 @@ if (commandString == "galxeTwMission"){
 }
 
 async function batchGalxeTwMission(){
-    for(let i = num1; i <= num2; i++){
-        let port = portBase + i
-        let webSocketDebuggerUrl = "http://127.0.0.1:" + port + "/json/version"
-        galxeTwMission(i, port, webSocketDebuggerUrl, varSting1, varSting2, varSting3)
-        //await sleep(100)
-    }
+    batchProcess(galxeTwMission, varSting1, varSting2, varSting3)
 }
+
 //varSting3 close time
 async function galxeTwMission(index, port, webSocketDebuggerUrl, varSting1, varSting2, varSting3){
     const result = await isPortTaken(port, '127.0.0.1')
@@ -1215,12 +1186,7 @@ if (commandString == "argentLogin"){
 }
 
 async function argent(){
-    for(let i = num1; i <= num2; i++){
-        let port = portBase + i
-        let webSocketDebuggerUrl = "http://127.0.0.1:" + port + "/json/version"
-        argentLogin(i, port, webSocketDebuggerUrl)
-        //await sleep(100)
-    }
+    batchProcess(argentLogin)
 }
 
 async function argentLogin(index, port, webSocketDebuggerUrl){
@@ -1263,12 +1229,7 @@ if (commandString == "click"){
 }
 
 async function batchClickElement(){
-    for(let i = num1; i <= num2; i++){
-        let port = portBase + i
-        let webSocketDebuggerUrl = "http://127.0.0.1:" + port + "/json/version"
-        click(i, port, webSocketDebuggerUrl, varSting1, varSting2)
-        //await sleep(100)
-    }
+    batchProcess(click, varSting1, varSting2)
 }
 
 
@@ -1327,12 +1288,7 @@ if (commandString == "input"){
 }
 
 async function batchInputElement(){
-    for(let i = num1; i <= num2; i++){
-        let port = portBase + i
-        let webSocketDebuggerUrl = "http://127.0.0.1:" + port + "/json/version"
-        input(i, port, webSocketDebuggerUrl, varSting1, varSting2, varSting3)
-        //await sleep(100)
-    }
+    batchProcess(input, varSting1, varSting2, varSting3)
 }
 
 
@@ -1391,12 +1347,7 @@ if (commandString == "close"){
 }
 
 async function batchClosePage(){
-    for(let i = num1; i <= num2; i++){
-        let port = portBase + i
-        let webSocketDebuggerUrl = "http://127.0.0.1:" + port + "/json/version"
-        closePage(i, port, webSocketDebuggerUrl, varSting1)
-        //await sleep(100)
-    }
+    batchProcess(closePage, varSting1)
 }
 
 
@@ -1446,12 +1397,7 @@ if (commandString == "signin"){
 }
 
 async function batchSignIn(){
-    for(let i = num1; i <= num2; i++){
-        let port = portBase + i
-        let webSocketDebuggerUrl = "http://127.0.0.1:" + port + "/json/version"
-        signIn(i, port, webSocketDebuggerUrl)
-        //await sleep(100)
-    }
+    batchProcess(signIn)
 }
 
 
@@ -1509,12 +1455,7 @@ if (commandString == "devmode"){
 }
 
 async function batchSwitchDevmode(){
-    for(let i = num1; i <= num2; i++){
-        let port = portBase + i
-        let webSocketDebuggerUrl = "http://127.0.0.1:" + port + "/json/version"
-        switchDevmode(i, port, webSocketDebuggerUrl)
-        //await sleep(100)
-    }
+    batchProcess(switchDevmode)
 }
 
 
@@ -1556,7 +1497,7 @@ async function switchDevmode(index, port, webSocketDebuggerUrl) {
 //================== TW
 
 let token_array = [];
-const fs = require('fs').promises;
+//const fs = require('fs').promises;
 
 async function readAndProcessFileTwitter() {
   try {
@@ -1596,12 +1537,7 @@ if (commandString == "twlogin"){
 }
 
 async function batchTwLogin(){
-    for(let i = num1; i <= num2; i++){
-        let port = portBase + i
-        let webSocketDebuggerUrl = "http://127.0.0.1:" + port + "/json/version"
-        TwLogin(i, port, webSocketDebuggerUrl)
-        //await sleep(100)
-    }
+    batchProcess(TwLogin)
 }
 
 async function TwLogin(index, port, webSocketDebuggerUrl) {
@@ -1685,12 +1621,7 @@ if (commandString == "dislogin"){
 }
 
 async function batchDiscordLogin(){
-    for(let i = num1; i <= num2; i++){
-        let port = portBase + i
-        let webSocketDebuggerUrl = "http://127.0.0.1:" + port + "/json/version"
-        discordLogin(i, port, webSocketDebuggerUrl)
-        //await sleep(100)
-    }
+    batchProcess(discordLogin)
 }
 
 async function discordLogin(index, port, webSocketDebuggerUrl) {

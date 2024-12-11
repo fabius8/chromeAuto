@@ -4,3 +4,5 @@ plugins
 Chrome-bin/
 extracted_plugins
 pluginsDisable
+USERDATA
+chrome_ports.json

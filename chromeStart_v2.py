@@ -7,12 +7,91 @@ import zipfile
 import tkinter as tk
 from tkinter import messagebox
 import sys
+import json
+import socket
+
+def cleanup_port_mapping():
+    """清理无效的端口映射"""
+    port_mapping = load_port_mapping()
+    invalid_ports = []
+    
+    print("检查端口映射有效性...")
+    for chrome_id, port in port_mapping.items():
+        # 检查端口是否真正被使用
+        if not is_port_in_use(port):
+            invalid_ports.append(chrome_id)
+            print(f"发现无效端口映射 - Chrome ID: {chrome_id}, Port: {port}")
+    
+    # 删除无效的端口映射
+    for chrome_id in invalid_ports:
+        del port_mapping[chrome_id]
+        print(f"已删除无效端口映射 - Chrome ID: {chrome_id}")
+    
+    if invalid_ports:
+        save_port_mapping(port_mapping)
+        print(f"已清理 {len(invalid_ports)} 个无效端口映射")
+    else:
+        print("所有端口映射都有效")
+
+def is_port_in_use(port):
+    """检查端口是否被占用"""
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        try:
+            s.bind(('localhost', port))
+            return False
+        except socket.error:
+            return True
+
+def get_available_port(chrome_id):
+    """获取可用端口"""
+    port_mapping = load_port_mapping()
+    
+    # 检查现有映射
+    if str(chrome_id) in port_mapping:
+        existing_port = port_mapping[str(chrome_id)]
+        if is_port_in_use(existing_port):
+            return existing_port
+        else:
+            # 端口未使用，删除旧映射
+            del port_mapping[str(chrome_id)]
+            save_port_mapping(port_mapping)
+    
+    # 获取系统分配的随机可用端口
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.bind(('', 0))  # 绑定到随机可用端口
+        s.listen(1)
+        port = s.getsockname()[1]
+        
+    # 保存新的端口映射
+    port_mapping[str(chrome_id)] = port
+    save_port_mapping(port_mapping)
+    return port
+
+def load_port_mapping():
+    """从JSON文件加载端口映射"""
+    try:
+        with open('chrome_ports.json', 'r') as f:
+            return json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        return {}
+
+def save_port_mapping(port_mapping):
+    """保存端口映射到JSON文件"""
+    with open('chrome_ports.json', 'w') as f:
+        json.dump(port_mapping, f, indent=4)
+
+def release_port(chrome_id):
+    """释放指定用户的端口"""
+    port_mapping = load_port_mapping()
+    if str(chrome_id) in port_mapping:
+        del port_mapping[str(chrome_id)]
+        save_port_mapping(port_mapping)
 
 def get_screen_size():
     """获取屏幕大小并根据缩放比例调整"""
     screen_width, screen_height = pyautogui.size()
-    x_change = 0.65
-    y_change = 0.64
+    x_change = 0.7
+    y_change = 0.7
     screen_width *= x_change
     screen_height *= y_change
     return int(screen_width), int(screen_height)
@@ -156,6 +235,9 @@ def launch_chrome(i, port, window_size, window_position, proxy):
     time.sleep(0.8)
 
 def main():
+    # 在程序开始时清理无效的端口映射
+    cleanup_port_mapping()
+
     screen_width, screen_height = get_screen_size()
     range_list = get_range_list()
     if not range_list:
@@ -167,12 +249,12 @@ def main():
         return
     
     window_size = f"--window-size={layout['window_width']},{layout['window_height']}"
-    port_base = 9200
+
     proxies = read_proxies()
     warning_shown = False
 
     for index, i in enumerate(range_list):
-        port = port_base + i
+        port = get_available_port(i)
         x, y = get_window_position(index, layout)
         window_position = f"--window-position={x},{y}"
         
