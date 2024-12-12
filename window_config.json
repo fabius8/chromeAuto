@@ -1,0 +1,11 @@
+{
+    "screen": {
+        "x_scale": 0.7,
+        "y_scale": 0.7
+    },
+    "window": {
+        "min_width": 400,
+        "min_height": 300,
+        "margin": 5
+    }
+}

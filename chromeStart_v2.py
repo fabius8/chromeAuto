@@ -87,20 +87,32 @@ def release_port(chrome_id):
         del port_mapping[str(chrome_id)]
         save_port_mapping(port_mapping)
 
+def load_window_config():
+    """加载窗口配置"""
+    try:
+        with open('window_config.json', 'r') as f:
+            return json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        # 默认配置
+        return {
+            "screen": {"x_scale": 0.7, "y_scale": 0.7},
+            "window": {"min_width": 400, "min_height": 300, "margin": 1},
+        }
+
 def get_screen_size():
     """获取屏幕大小并根据缩放比例调整"""
+    config = load_window_config()
     screen_width, screen_height = pyautogui.size()
-    x_change = 0.7
-    y_change = 0.7
-    screen_width *= x_change
-    screen_height *= y_change
-    return int(screen_width), int(screen_height)
+    x_scale = config["screen"]["x_scale"]
+    y_scale = config["screen"]["y_scale"]
+    return int(screen_width * x_scale), int(screen_height * y_scale)
 
 def calculate_layout(num_windows, screen_width, screen_height):
     """计算最优的窗口布局"""
-    min_width = 400
-    min_height = 300
-    margin = 10
+    config = load_window_config()
+    min_width = config["window"]["min_width"]
+    min_height = config["window"]["min_height"]
+    margin = config["window"]["margin"]
     
     best_layout = None
     min_wasted_space = float('inf')
@@ -108,8 +120,13 @@ def calculate_layout(num_windows, screen_width, screen_height):
     for cols in range(1, num_windows + 1):
         rows = (num_windows + cols - 1) // cols
         
-        window_width = (screen_width - (cols + 1) * margin) // cols
-        window_height = (screen_height - (rows + 1) * margin) // rows
+        # 计算单个窗口的宽度和高度
+        # 注意：现在margin只在窗口之间，不在屏幕边缘
+        usable_width = screen_width - (cols - 1) * margin  # 减去窗口之间的间距
+        usable_height = screen_height - (rows - 1) * margin  # 减去窗口之间的间距
+        
+        window_width = usable_width // cols
+        window_height = usable_height // rows
         
         if window_width < min_width or window_height < min_height:
             continue
@@ -122,22 +139,25 @@ def calculate_layout(num_windows, screen_width, screen_height):
                 'rows': rows,
                 'cols': cols,
                 'window_width': window_width,
-                'window_height': window_height
+                'window_height': window_height,
+                'margin': margin
             }
     
     return best_layout
 
-def get_window_position(index, layout, margin=10):
+def get_window_position(index, layout):
     """计算每个窗口的位置"""
     cols = layout['cols']
     window_width = layout['window_width']
     window_height = layout['window_height']
+    margin = layout['margin']
     
     row = index // cols
     col = index % cols
     
-    x = margin + col * (window_width + margin)
-    y = margin + row * (window_height + margin)
+    # 计算窗口位置，只在窗口之间添加margin
+    x = col * (window_width + margin)
+    y = row * (window_height + margin)
     
     return x, y
 
