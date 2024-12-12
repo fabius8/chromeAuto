@@ -8,6 +8,10 @@ from pynput import mouse, keyboard
 import threading
 from typing import Dict, Optional
 import time
+import win32event
+import win32api
+import winerror
+import sys
 
 class ChromeWindowMonitor:
     def __init__(self):
@@ -515,6 +519,21 @@ class ChromeWindowMonitor:
         self.log('system', "程序已停止运行")
 
 if __name__ == "__main__":
-    monitor = ChromeWindowMonitor()
-    # 默认只开启错误日志，其他都关闭
-    monitor.start()
+
+    
+    # 创建互斥锁
+    mutex_name = "ChromeWindowMonitor_Mutex_Lock"
+    mutex = win32event.CreateMutex(None, False, mutex_name)
+    last_error = win32api.GetLastError()
+    
+    if last_error == winerror.ERROR_ALREADY_EXISTS:
+        print("程序已经在运行中！")
+        win32api.CloseHandle(mutex)
+        sys.exit(1)
+    
+    try:
+        monitor = ChromeWindowMonitor()
+        monitor.start()
+    finally:
+        # 确保关闭互斥锁
+        win32api.CloseHandle(mutex)
