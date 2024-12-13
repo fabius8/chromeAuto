@@ -263,7 +263,10 @@ def main():
     if not range_list:
         return
     
-    layout = calculate_layout(len(range_list), screen_width, screen_height)
+    # 修改这里:当窗口数量小于10个时使用10来计算布局,否则使用实际数量
+    num_windows = len(range_list)
+    layout = calculate_layout(10 if num_windows < 10 else num_windows, screen_width, screen_height)
+    
     if not layout:
         messagebox.showerror("错误", "无法找到合适的窗口布局！")
         return
