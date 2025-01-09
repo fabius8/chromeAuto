@@ -94,6 +94,47 @@ async function batchProcess(handler, ...params) {
 }
 ////////////////////////////////////////////////////////////////////////////////////
 //ok wallet YES
+if (commandString == "test"){
+    console.log(commandString, "...")
+    BatchTest()
+}
+
+// 修改原有的批处理函数
+async function BatchTest(){
+    batchProcess(test, varSting1)
+}
+
+async function test(index, port, webSocketDebuggerUrl, varSting1){
+    const result = await isPortTaken(port, '127.0.0.1')
+    if (result) {
+        console.log(index, result, port, "已启动！")
+    }
+    else {
+        return
+    }
+    if (varSting1 == null){
+        await randomSleep(1, 3 * 1000)
+    }else{
+        await randomSleep(1, parseInt(varSting1) * 1000)
+    }
+    let wsKey = await axios.get(webSocketDebuggerUrl);
+    let browser = await puppeteer.connect({
+        browserWSEndpoint: wsKey.data.webSocketDebuggerUrl,
+        defaultViewport:null
+    });
+
+    const pages = await browser.pages();
+    let currentPage
+    for (let i = 0; i < pages.length; i++) {
+        const page = pages[i];
+        const url = await page.url();
+        console.log(url)
+    }
+    console.log("browser disconnecting...")
+    browser.disconnect()
+}
+////////////////////////////////////////////////////////////////////////////////////
+//ok wallet YES
 if (commandString == "keplrYes"){
     console.log(commandString, "...")
     BatchkeplrYes()

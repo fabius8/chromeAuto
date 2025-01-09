@@ -137,6 +137,9 @@ def sync_window():
 def incognito_mode():
     run_command(f"cd /d {base_path} && python chromeStart_incognito.py", "无痕模式已启动", "启动无痕模式失败")
 
+def arrange_windows():
+    run_command(f"cd /d {base_path} && python arrangeWindows.py", "窗口重新排列完成", "窗口排列失败")
+
 def open_web(url, key):
     if not url:
         log_message("URL不能为空")
@@ -220,6 +223,7 @@ buttons = [
     ("无痕模式", incognito_mode),
     ("缩小恢复谷歌", zoom_google),
     ("提取TG TOKEN", extract_query_id),
+    ("重新排列", arrange_windows),
 ]
 
 for text, command in buttons:
