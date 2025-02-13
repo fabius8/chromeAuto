@@ -237,6 +237,7 @@ def launch_chrome(i, port, window_size, window_position, proxy):
         "--disable-session-crashed-bubble",
         "--hide-crash-restore-bubble",
         "--disable-features=Translate",
+        "--disable-system-tray-icon",
         window_position,
         user_data_dir,
         remote_debugging_port
@@ -284,12 +285,12 @@ def main():
         if 0 < i <= len(proxies):
             proxy = proxies[i - 1]
         else:
-            if not warning_shown:
-                root = tk.Tk()
-                root.withdraw()
-                messagebox.showwarning("警告", "代理服务器未配置！")
-                root.destroy()
-                warning_shown = True
+            # if not warning_shown:
+            #     root = tk.Tk()
+            #     root.withdraw()
+            #     messagebox.showwarning("警告", "代理服务器未配置！")
+            #     root.destroy()
+            #     warning_shown = True
             proxy = None
         
         launch_chrome(i, port, window_size, window_position, proxy)

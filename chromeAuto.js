@@ -4,6 +4,8 @@ const net = require('net');
 const path = require('path');
 const fs = require('fs');
 require("dotenv").config();
+const { faker } = require('@faker-js/faker');
+
 
 const currentDirectory = process.cwd();
 const relateDirectory = "pproxy\\switchomega_bak\\"
@@ -94,47 +96,6 @@ async function batchProcess(handler, ...params) {
 }
 ////////////////////////////////////////////////////////////////////////////////////
 //ok wallet YES
-if (commandString == "test"){
-    console.log(commandString, "...")
-    BatchTest()
-}
-
-// 修改原有的批处理函数
-async function BatchTest(){
-    batchProcess(test, varSting1)
-}
-
-async function test(index, port, webSocketDebuggerUrl, varSting1){
-    const result = await isPortTaken(port, '127.0.0.1')
-    if (result) {
-        console.log(index, result, port, "已启动！")
-    }
-    else {
-        return
-    }
-    if (varSting1 == null){
-        await randomSleep(1, 3 * 1000)
-    }else{
-        await randomSleep(1, parseInt(varSting1) * 1000)
-    }
-    let wsKey = await axios.get(webSocketDebuggerUrl);
-    let browser = await puppeteer.connect({
-        browserWSEndpoint: wsKey.data.webSocketDebuggerUrl,
-        defaultViewport:null
-    });
-
-    const pages = await browser.pages();
-    let currentPage
-    for (let i = 0; i < pages.length; i++) {
-        const page = pages[i];
-        const url = await page.url();
-        console.log(url)
-    }
-    console.log("browser disconnecting...")
-    browser.disconnect()
-}
-////////////////////////////////////////////////////////////////////////////////////
-//ok wallet YES
 if (commandString == "keplrYes"){
     console.log(commandString, "...")
     BatchkeplrYes()
@@ -183,6 +144,61 @@ async function keplrYes(index, port, webSocketDebuggerUrl, varSting1){
         }
     }
     console.log("browser disconnecting...")
+    browser.disconnect()
+}
+////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////
+//ok wallet YES
+if (commandString == "randomUserName"){
+    console.log(commandString, "...")
+    batchRandomUsername()
+}
+
+// 修改原有的批处理函数
+async function batchRandomUsername(){
+    batchProcess(randomUsername, varSting1)
+}
+
+async function randomUsername(index, port, webSocketDebuggerUrl, varSting1){
+    const result = await isPortTaken(port, '127.0.0.1')
+    if (result) {
+        console.log(index, result, port, "已启动！")
+    }
+    else {
+        return
+    }
+
+    await randomSleep(1, 3 * 1000)
+
+    let wsKey = await axios.get(webSocketDebuggerUrl);
+    let browser = await puppeteer.connect({
+        browserWSEndpoint: wsKey.data.webSocketDebuggerUrl,
+        defaultViewport:null
+    });
+
+    const pages = await browser.pages();
+    let currentPage = null;
+    for (const page of pages) {
+        const url = await page.url();
+        console.log('检查URL:', url); // 调试日志
+        if (url.includes(varSting1)) {
+            currentPage = page;
+            break;
+        }
+    }
+    
+    // 直接使用键盘输入随机用户名
+    const rawUsername = faker.internet.username();
+    // 只保留字母和数字 - 使用更明确的方式
+    const username = rawUsername
+        .replace(/[._\-]/g, '')  // 特别去除点号、下划线和连字符
+        .replace(/[^a-zA-Z0-9]/g, ''); // 再次清除其他所有特殊字符
+
+    console.log(index, currentPage.url(), username)
+    //await currentPage.bringToFront(); // 激活当前标签页
+
+    await currentPage.keyboard.type(username);
+    //console.log("browser disconnecting...")
     browser.disconnect()
 }
 ////////////////////////////////////////////////////////////////////////////////////
@@ -1704,4 +1720,204 @@ async function discordLogin(index, port, webSocketDebuggerUrl) {
     browser.disconnect()
 }
 //==================
+if (commandString == "clickNiu"){
+    console.log(commandString, "...")
+    batchClickNiu()
+}
 
+async function batchClickNiu(){
+    batchProcess(clickNiu)
+}
+
+async function clickNiu(index, port, webSocketDebuggerUrl) {
+    const result = await isPortTaken(port, '127.0.0.1')
+    if (result) {
+        console.log(index, result, port, "已启动！")
+    }
+    else {
+        return
+    }
+
+    let wsKey = await axios.get(webSocketDebuggerUrl);
+    let browser = await puppeteer.connect({
+        browserWSEndpoint: wsKey.data.webSocketDebuggerUrl,
+        defaultViewport:null
+    });
+    try{
+        // 获取所有页面
+        const pages = await browser.pages();
+        let targetPage = null;
+
+        // 查找目标页面
+        for (const page of pages) {
+            const url = await page.url();
+            if (url.includes('tap.eclipse.xyz')) {
+                console.log('找到页面', page.url());
+                targetPage = page;
+                break;
+            }
+        }
+
+        if (!targetPage) {
+            console.log('未找到目标页面');
+            await browser.close();
+            return;
+        }
+
+        // 确保canvas元素存在
+        const canvasExists = await targetPage.evaluate(() => {
+            return !!document.querySelector('canvas');
+        }).catch(() => false);
+
+        if (!canvasExists) {
+            console.log('Canvas元素不存在，停止点击');
+            return;
+        }
+        console.log('找到Canvas元素', canvasExists);
+
+        try {
+            // 获取 canvas 元素的位置和尺寸
+            const canvasRect = await targetPage.evaluate(() => {
+                const canvas = document.querySelector('canvas');
+                const rect = canvas.getBoundingClientRect();
+                return {
+                    x: rect.left,
+                    y: rect.top,
+                    width: canvas.width,
+                    height: canvas.height
+                };
+            });
+            for (let i = 0; i < 10; i++) {
+                // 生成随机点击位置
+                const clickX = canvasRect.x + Math.random() * canvasRect.width;
+                const clickY = canvasRect.y + Math.random() * canvasRect.height;
+
+                // 执行点击
+                await targetPage.mouse.click(clickX, clickY);
+
+                // 生成随机延迟（1-2.5秒）
+                const delay = 1000 + Math.random() * 1500;
+                await sleep(delay)
+            }
+            
+        } catch (error) {
+            console.error('点击过程出错:', error);
+            await browser.close();
+        }
+    }
+    catch(e){
+        console.log(index, 'e==>', e.message)
+        await sleep(5000)
+    }
+    
+    //await sleep(3000)
+    console.log(index, "点击结束")
+    await browser.disconnect()
+}
+//==================
+////////////////////////////////////////////////////////////////////////////////////
+//===========================
+if (commandString == "phantomLogin"){
+    console.log(commandString, "...")
+    batchPhantomLogin()
+}
+
+async function batchPhantomLogin(){
+    batchProcess(phantomLogin, varSting1)
+}
+
+async function phantomLogin(index, port, webSocketDebuggerUrl, varSting1){
+    const result = await isPortTaken(port, '127.0.0.1')
+    if (result) {
+        console.log(index, result, port, "已启动！")
+    }
+    else {
+        return
+    }
+    if (varSting1 == null){
+        await randomSleep(1, 3000)
+    }else{
+        await randomSleep(1, parseInt(varSting1) * 1000)
+    }
+    let wsKey = await axios.get(webSocketDebuggerUrl);
+    let browser = await puppeteer.connect({
+        browserWSEndpoint: wsKey.data.webSocketDebuggerUrl,
+        defaultViewport:null
+    });
+    try{
+        let page = await browser.newPage()
+        const extensionUrl = "chrome-extension://bfnaelmomeimhlpmgjnjophhpkkoljpa/popup.html";
+        await page.goto(extensionUrl, { waitUntil: 'load' });
+    
+        await sleep(100)
+        let selector = 'input[type=password]'
+        let input = await waitForSelectorWithRetry(page, selector, 2, 2000)
+        if (input == null){
+            browser.disconnect()
+            return
+        }
+        await input.type(metamask_password);
+        await sleep(100)
+        await page.keyboard.press('Enter'),
+
+        console.log("第", index, "个", "keplr 已解锁！")
+    }catch(e){
+        console.log('e==>', e.message)
+    }
+    console.log("browser disconnecting...")
+    browser.disconnect()
+}
+//===========================
+////////////////////////////////////////////////////////////////////////////////////
+//===========================
+if (commandString == "backpackLogin"){
+    console.log(commandString, "...")
+    batchBackpackLogin()
+}
+
+async function batchBackpackLogin(){
+    batchProcess(backpackLogin, varSting1)
+}
+
+async function backpackLogin(index, port, webSocketDebuggerUrl, varSting1){
+    const result = await isPortTaken(port, '127.0.0.1')
+    if (result) {
+        console.log(index, result, port, "已启动！")
+    }
+    else {
+        return
+    }
+    if (varSting1 == null){
+        await randomSleep(1, 3000)
+    }else{
+        await randomSleep(1, parseInt(varSting1) * 1000)
+    }
+    let wsKey = await axios.get(webSocketDebuggerUrl);
+    let browser = await puppeteer.connect({
+        browserWSEndpoint: wsKey.data.webSocketDebuggerUrl,
+        defaultViewport:null
+    });
+    try{
+        let page = await browser.newPage()
+        const extensionUrl = "chrome-extension://aflkmfhebedbjioipglgcbcmnbpgliof/popup.html";
+        await page.goto(extensionUrl, { waitUntil: 'load' });
+    
+        await sleep(100)
+        let selector = 'input[type=password]'
+        let input = await waitForSelectorWithRetry(page, selector, 2, 2000)
+        if (input == null){
+            browser.disconnect()
+            return
+        }
+        await input.type(metamask_password);
+        await sleep(100)
+        await page.keyboard.press('Enter'),
+
+        console.log("第", index, "个", "keplr 已解锁！")
+    }catch(e){
+        console.log('e==>', e.message)
+    }
+    console.log("browser disconnecting...")
+    browser.disconnect()
+}
+//===========================

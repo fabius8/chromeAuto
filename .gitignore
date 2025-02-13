@@ -6,3 +6,5 @@ extracted_plugins
 pluginsDisable
 USERDATA
 chrome_ports.json
+node_modules
+package-lock.json
